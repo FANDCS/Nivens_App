@@ -1,0 +1,37 @@
+<!--
+  Πρόσθεσε αυτό ΜΕΣΑ στο <activity> tag του android/app/src/main/AndroidManifest.xml
+  (αμέσως μετά το υπάρχον <intent-filter> block που έχει MAIN/LAUNCHER).
+  
+  Με αυτό, η εφαρμογή εμφανίζεται ως επιλογή στο Android "Άνοιξε με..." για
+  αρχεία .md, .txt, .json, .pdf, .notesbackup.
+-->
+
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <!-- Markdown -->
+    <data android:mimeType="text/markdown" />
+    <data android:mimeType="text/x-markdown" />
+    <!-- Plain text (.txt, .md) -->
+    <data android:mimeType="text/plain" />
+    <!-- JSON -->
+    <data android:mimeType="application/json" />
+    <!-- PDF -->
+    <data android:mimeType="application/pdf" />
+    <!-- Custom backup format -->
+    <data android:mimeType="application/octet-stream" />
+</intent-filter>
+
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <!-- File extensions (για file managers που στέλνουν file:// URIs) -->
+    <data android:scheme="file" android:pathPattern=".*\\.md" />
+    <data android:scheme="file" android:pathPattern=".*\\.txt" />
+    <data android:scheme="file" android:pathPattern=".*\\.json" />
+    <data android:scheme="file" android:pathPattern=".*\\.pdf" />
+    <data android:scheme="file" android:pathPattern=".*\\.notesbackup" />
+    <data android:scheme="content" />
+</intent-filter>

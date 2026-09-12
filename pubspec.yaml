@@ -1,0 +1,67 @@
+name: notes_app
+description: Markdown notes app με πολυμέσα, ζωγραφική, sync και encryption
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # --- Markdown / rich editing ---
+  markdown: ^7.2.2
+  flutter_markdown: ^0.7.4+1   # για το rendered Preview mode στον editor
+
+  # --- Local DB (encrypted SQLite) ---
+  drift: ^2.20.0
+  sqlcipher_flutter_libs: ^0.6.4
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # --- Encryption ---
+  cryptography: ^2.7.0
+  flutter_secure_storage: ^9.2.2
+
+  # --- Πολυμέσα / ζωγραφική ---
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+  scribble: ^0.10.0+1
+  record: ^7.1.1
+
+  # --- PDF ανάγνωση ---
+  syncfusion_flutter_pdf: ^34.2.3
+
+  # --- Sync (Supabase) ---
+  supabase_flutter: ^2.6.0
+
+  # --- Charts ---
+  fl_chart: ^0.69.0
+
+  # --- QR export ---
+  qr_flutter: ^4.1.0
+
+  # --- State / prefs ---
+  flutter_riverpod: ^2.6.1
+  shared_preferences: ^2.3.2
+
+  uuid: ^4.5.1
+  yaml: ^3.1.2
+  yaml_writer: ^2.1.0
+  archive: ^4.0.7
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true   # ενεργοποιεί auto-generation των ARB translations
