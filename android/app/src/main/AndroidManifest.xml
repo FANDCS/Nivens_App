@@ -1,4 +1,21 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Βασικές άδειες (τεκμηριωμένες ήδη στο ANDROID_SETUP.md αλλά έλειπαν
+         από το πραγματικό manifest). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Χρειάζονται για να μπορεί η εφαρμογή να δημιουργεί/γράφει στον
+         δημόσιο φάκελο Documents/Nivens (εξαγωγές, εικόνες, σχέδια). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
     <application
         android:label="notes_app"
         android:name="${applicationName}"
@@ -40,6 +57,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- permission_handler: επιτρέπει το άνοιγμα της οθόνης ρυθμίσεων
+             "Άδεια πρόσβασης σε όλα τα αρχεία" (Android 11+). -->
+        <intent>
+            <action android:name="android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"/>
         </intent>
     </queries>
 </manifest>

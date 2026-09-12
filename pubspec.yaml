@@ -32,8 +32,22 @@ dependencies:
   scribble: ^0.10.0+1
   record: ^7.1.1
 
-  # --- PDF ανάγνωση ---
-  syncfusion_flutter_pdf: ^34.2.3
+  # --- PDF ανάγνωση / προβολή ---
+  # ΣΗΜΕΙΩΣΗ: τα δύο παρακάτω πακέτα Syncfusion ΠΡΕΠΕΙ να έχουν πάντα το
+  # ΙΔΙΟ, ακριβές (χωρίς ^) version — μοιράζονται εσωτερικά το
+  # syncfusion_flutter_core και pub αποτυγχάνει αν διαφέρουν.
+  # Κρατάμε 31.2.18 (και όχι κάτι πιο πρόσφατο) επίτηδες: από την
+  # 33.2.13+1 και μετά το syncfusion_flutter_pdfviewer απαιτεί
+  # device_info_plus ^13.1.0 → win32 ^6.0.1, το οποίο συγκρούεται με το
+  # flutter_secure_storage_windows (win32 ^5.x). Αν στο μέλλον το
+  # flutter_secure_storage ανεβάσει το δικό του win32, μπορείς να
+  # ανεβάσεις μαζί και τα δύο Syncfusion πακέτα.
+  syncfusion_flutter_pdf: 31.2.18
+  syncfusion_flutter_pdfviewer: 31.2.18
+  syncfusion_flutter_core: 31.2.18
+
+  # --- Άδειες αποθηκευτικού χώρου (για τον φάκελο Documents/Nivens) ---
+  permission_handler: ^11.3.1
 
   # --- Sync (Supabase) ---
   supabase_flutter: ^2.6.0

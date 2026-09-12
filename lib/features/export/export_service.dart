@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import '../../core/storage/nivens_folder.dart';
 
 /// Μορφή εξαγωγής για μία σημείωση.
 enum ExportFormat { markdown, json, qr }
@@ -134,11 +134,8 @@ class ExportService {
       ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
   }
 
-  Future<Directory> _exportDirectory() async {
-    try {
-      final extDir = await getExternalStorageDirectory();
-      if (extDir != null) return extDir;
-    } catch (_) {}
-    return getApplicationDocumentsDirectory();
-  }
+  /// Όλα τα exports πλέον πηγαίνουν στον φάκελο Documents/Nivens/exports,
+  /// ώστε ο χρήστης να τα βρίσκει εύκολα (Files app / File Manager),
+  /// αντί για έναν κρυμμένο εσωτερικό φάκελο της εφαρμογής.
+  Future<Directory> _exportDirectory() => NivensFolder.sub('exports');
 }

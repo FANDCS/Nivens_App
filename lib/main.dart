@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_core/core.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'core/encryption/encryption_service.dart';
 import 'core/storage/app_database.dart';
@@ -15,8 +16,20 @@ import 'features/notes/note_editor_screen.dart';
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
+/// Δωρεάν "Community License" key από τη Syncfusion — χρειάζεται ΜΟΝΟ αν
+/// χρησιμοποιείς οπτικά widgets τους (π.χ. το SfPdfViewer της νέας
+/// "Προβολή ως PDF"), αλλιώς εμφανίζεται banner δοκιμαστικής έκδοσης.
+/// Βγάλε ΔΩΡΕΑΝ κλειδί (community license) από:
+/// https://www.syncfusion.com/sales/communitylicense
+/// και πέρασέ το είτε εδώ είτε (καλύτερα) μέσω
+/// --dart-define=SYNCFUSION_LICENSE_KEY=... ώστε να μη μπει στο git.
+const syncfusionLicenseKey = String.fromEnvironment('SYNCFUSION_LICENSE_KEY');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (syncfusionLicenseKey.isNotEmpty) {
+    SyncfusionLicense.registerLicense(syncfusionLicenseKey);
+  }
   final prefs = await SharedPreferences.getInstance();
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {

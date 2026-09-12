@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/storage/app_database.dart';
 import '../notes/models/note.dart';
+import '../pdf/pdf_viewer_screen.dart';
 import 'export_service.dart';
 
 class ImportScreen extends StatefulWidget {
@@ -49,6 +50,16 @@ class _ImportScreenState extends State<ImportScreen> {
       } else if (ext == 'json') {
         await _importJson(path);
       } else if (ext == 'pdf') {
+        final viewOnly = await _askPdfViewOnly();
+        if (viewOnly == true) {
+          if (mounted) {
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => PdfViewerScreen(filePath: path, title: File(path).uri.pathSegments.last),
+            ));
+          }
+          setState(() => _statusMessage = null);
+          return;
+        }
         await _importPdf(path);
       } else {
         // md / txt
@@ -103,6 +114,29 @@ class _ImportScreenState extends State<ImportScreen> {
     final raw = await File(path).readAsString();
     await _saveNoteFromJson(raw);
     setState(() => _statusMessage = 'Εισήχθη 1 σημείωση (JSON).');
+  }
+
+  Future<bool?> _askPdfViewOnly() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Αρχείο PDF'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Row(children: [
+              Icon(Icons.picture_as_pdf_outlined), SizedBox(width: 12), Text('Προβολή ως PDF'),
+            ]),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Row(children: [
+              Icon(Icons.text_snippet_outlined), SizedBox(width: 12), Text('Εξαγωγή κειμένου σε νέα σημείωση'),
+            ]),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _importPdf(String path) async {
@@ -193,7 +227,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 'Υποστηριζόμενες μορφές:\n'
                 '.md / .txt — Markdown ή απλό κείμενο\n'
                 '.json — Εξαγωγή σε JSON\n'
-                '.pdf — Εξαγωγή κειμένου από PDF\n'
+                '.pdf — Προβολή ως PDF ή εξαγωγή κειμένου\n'
                 '.notesbackup — Κρυπτογραφημένο backup (με κωδικό)',
                 textAlign: TextAlign.center,
               ),

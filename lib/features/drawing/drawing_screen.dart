@@ -11,7 +11,12 @@ class DrawingResult {
 
 class DrawingScreen extends StatefulWidget {
   final String? title;
-  const DrawingScreen({super.key, this.title});
+  /// Προαιρετικό στιγμιότυπο (PNG) που εμφανίζεται ΚΑΤΩ από τον διάφανο
+  /// καμβά σχεδίασης, ώστε ο χρήστης να ζωγραφίζει ΠΑΝΩ από ήδη υπάρχον
+  /// περιεχόμενο (π.χ. όλη η σημείωση). Το αποτέλεσμα (background +
+  /// σχέδιο) επιστρέφεται ήδη "flattened" σε ένα ενιαίο PNG.
+  final Uint8List? backgroundImageBytes;
+  const DrawingScreen({super.key, this.title, this.backgroundImageBytes});
 
   @override
   State<DrawingScreen> createState() => _DrawingScreenState();
@@ -108,10 +113,22 @@ class _DrawingScreenState extends State<DrawingScreen> {
       body: Column(
         children: [
           // ── Canvas ─────────────────────────────────────────────────────────
+          // Αν υπάρχει background (π.χ. "ζωγραφική πάνω σε όλα"), μπαίνει από
+          // κάτω· ο διάφανος καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer,
+          // άρα ό,τι ζωγραφίζεις εμφανίζεται πάνω από όλα τα υπόλοιπα.
           Expanded(
             child: RepaintBoundary(
               key: _repaintKey,
-              child: Scribble(notifier: _notifier, drawPen: true),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (widget.backgroundImageBytes != null)
+                    Positioned.fill(
+                      child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
+                    ),
+                  Scribble(notifier: _notifier, drawPen: true),
+                ],
+              ),
             ),
           ),
 
