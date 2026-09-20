@@ -27,6 +27,7 @@ import '../import/docx_reader.dart';
 import '../pdf/pdf_viewer_screen.dart';
 import 'models/note.dart';
 import 'note_fonts.dart';
+import '../../core/i18n.dart';
 
 /// Regex που ταιριάζει markdown εικόνα με προαιρετικό attribute μεγέθους:
 /// ![alt](path "w=NN")  → NN = πλάτος ως ποσοστό (%) του διαθέσιμου χώρου.
@@ -188,11 +189,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Διαγραφή σημείωσης'),
-        content: const Text('Είσαι σίγουρος;'),
+        title: Text(tr(context, el: 'Διαγραφή σημείωσης', en: 'Delete note')),
+        content: Text(tr(context, el: 'Είσαι σίγουρος;', en: 'Are you sure?')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Διαγραφή')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr(context, el: 'Διαγραφή', en: 'Delete'))),
         ],
       ),
     );
@@ -391,11 +392,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Διαγραφή ζωγραφιάς'),
-        content: const Text('Να αφαιρεθεί το επίπεδο ζωγραφικής από τη σημείωση;'),
+        title: Text(tr(context, el: 'Διαγραφή ζωγραφιάς', en: 'Delete drawing')),
+        content: Text(tr(context, el: 'Να αφαιρεθεί το επίπεδο ζωγραφικής από τη σημείωση;', en: 'Remove the drawing layer from this note?')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Διαγραφή')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr(context, el: 'Διαγραφή', en: 'Delete'))),
         ],
       ),
     );
@@ -455,18 +456,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return showDialog<_PdfAction>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Αρχείο PDF'),
+        title: Text(tr(context, el: 'Αρχείο PDF', en: 'PDF file')),
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_PdfAction.view),
-            child: const Row(children: [
-              Icon(Icons.picture_as_pdf_outlined), SizedBox(width: 12), Text('Προβολή ως PDF'),
+            child: Row(children: [
+              const Icon(Icons.picture_as_pdf_outlined), const SizedBox(width: 12),
+              Text(tr(context, el: 'Προβολή ως PDF', en: 'View as PDF')),
             ]),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_PdfAction.extractText),
-            child: const Row(children: [
-              Icon(Icons.text_snippet_outlined), SizedBox(width: 12), Text('Εξαγωγή κειμένου στη σημείωση'),
+            child: Row(children: [
+              const Icon(Icons.text_snippet_outlined), const SizedBox(width: 12),
+              Text(tr(context, el: 'Εξαγωγή κειμένου στη σημείωση', en: 'Extract text into note')),
             ]),
           ),
         ],
@@ -574,14 +577,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ανέβασμα στο termbin.com'),
-        content: const Text(
-          'Η σημείωση θα σταλεί ΧΩΡΙΣ κρυπτογράφηση σε δημόσιο pastebin. '
-          'Όποιος έχει το link μπορεί να τη διαβάσει. Συνέχεια;',
-        ),
+        title: Text(tr(context, el: 'Ανέβασμα στο termbin.com', en: 'Upload to termbin.com')),
+        content: Text(tr(
+          context,
+          el: 'Η σημείωση θα σταλεί ΧΩΡΙΣ κρυπτογράφηση σε δημόσιο pastebin. '
+              'Όποιος έχει το link μπορεί να τη διαβάσει. Συνέχεια;',
+          en: 'The note will be sent WITHOUT encryption to a public pastebin. '
+              'Anyone with the link can read it. Continue?',
+        )),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Ανέβασμα')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr(context, el: 'Ανέβασμα', en: 'Upload'))),
         ],
       ),
     );
@@ -597,7 +603,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Ανέβηκε στο termbin'),
+          title: Text(tr(context, el: 'Ανέβηκε στο termbin', en: 'Uploaded to termbin')),
           content: SelectableText(url),
           actions: [
             TextButton(
@@ -605,9 +611,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 Clipboard.setData(ClipboardData(text: url));
                 Navigator.of(ctx).pop();
               },
-              child: const Text('Αντιγραφή link'),
+              child: Text(tr(context, el: 'Αντιγραφή link', en: 'Copy link')),
             ),
-            FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Κλείσιμο')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr(context, el: 'Κλείσιμο', en: 'Close'))),
           ],
         ),
       );
@@ -650,76 +656,82 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
+      // ── AppBar ────────────────────────────────────────────────────────
+      // ΣΚΟΠΙΜΑ ελάχιστα κουμπιά εδώ (πάντα χωράνε, σε κάθε μέγεθος
+      // οθόνης). Οτιδήποτε δεν χρειάζεται να είναι ΠΑΝΤΑ ορατό (εισαγωγή,
+      // εξαγωγή, διαγραφή) πάει στο μενού «⋮». Τα κουμπιά ζουμ/ζωγραφικής
+      // της Προβολής μετακόμισαν σε επιπλέον («floating») πάνελ πάνω από
+      // το περιεχόμενο — βλ. _buildPreview() — ώστε να μην ξεχειλίζουν
+      // ποτέ πάνω στο κουμπί «πίσω».
       appBar: AppBar(
         titleSpacing: 0,
         title: TextField(
           controller: _titleController,
           style: Theme.of(context).textTheme.titleMedium,
-          decoration: const InputDecoration(hintText: 'Τίτλος', border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 8)),
+          decoration: InputDecoration(
+            hintText: tr(context, el: 'Τίτλος', en: 'Title'),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
         ),
         actions: [
-          // Ζουμ (μόνο στην Προβολή)
-          if (_previewMode) ...[
-            IconButton(
-              icon: const Icon(Icons.zoom_out),
-              tooltip: 'Σμίκρυνση',
-              onPressed: () => _applyZoom(1 / 1.25),
-            ),
-            // Ποσοστό ζουμ — πάτημα = επαναφορά στο 100%
-            InkWell(
-              onTap: _resetZoom,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                child: Text('${(_zoomLevel * 100).round()}%',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.zoom_in),
-              tooltip: 'Μεγέθυνση',
-              onPressed: () => _applyZoom(1.25),
-            ),
-            IconButton(
-              icon: const Icon(Icons.zoom_out_map),
-              tooltip: 'Επαναφορά ζουμ (ή διπλό πάτημα στη σελίδα)',
-              onPressed: _resetZoom,
-            ),
-            if (_overlayBytes != null)
-              IconButton(
-                icon: Icon(_overlayVisible ? Icons.gesture : Icons.gesture_outlined,
-                    color: _overlayVisible ? Theme.of(context).colorScheme.primary : null),
-                tooltip: _overlayVisible ? 'Απόκρυψη ζωγραφιάς' : 'Εμφάνιση ζωγραφιάς',
-                onPressed: () => setState(() => _overlayVisible = !_overlayVisible),
-              ),
-            IconButton(
-              icon: _isFlatteningDrawing
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.layers_outlined),
-              tooltip: 'Ζωγραφική πάνω σε όλα',
-              onPressed: _isFlatteningDrawing ? null : _drawOverEverything,
-            ),
-          ],
-          // Preview / Edit mode toggle
+          // Preview / Edit mode toggle — πάντα ορατό, είναι το πιο συχνό.
           IconButton(
             icon: Icon(_previewMode ? Icons.edit_outlined : Icons.visibility_outlined),
-            tooltip: _previewMode ? 'Λειτουργία επεξεργασίας' : 'Προβολή',
+            tooltip: _previewMode
+                ? tr(context, el: 'Λειτουργία επεξεργασίας', en: 'Edit mode')
+                : tr(context, el: 'Προβολή', en: 'Preview'),
             onPressed: () => setState(() => _previewMode = !_previewMode),
           ),
-          IconButton(icon: const Icon(Icons.file_open_outlined), tooltip: 'Εισαγωγή', onPressed: _importFile),
-          IconButton(
-            icon: _isExporting
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.ios_share_outlined),
-            onPressed: _isExporting ? null : _exportThisNote,
-          ),
-          if (widget.existingNoteId != null)
-            IconButton(icon: const Icon(Icons.delete_outline), onPressed: _delete),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.check),
+            tooltip: tr(context, el: 'Αποθήκευση', en: 'Save'),
             onPressed: _isSaving ? null : _save,
+          ),
+          PopupMenuButton<String>(
+            tooltip: tr(context, el: 'Περισσότερα', en: 'More'),
+            onSelected: (value) {
+              switch (value) {
+                case 'import': _importFile(); break;
+                case 'export': _exportThisNote(); break;
+                case 'delete': _delete(); break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'import',
+                child: ListTile(
+                  leading: const Icon(Icons.file_open_outlined),
+                  title: Text(tr(context, el: 'Εισαγωγή αρχείου', en: 'Import file')),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'export',
+                enabled: !_isExporting,
+                child: ListTile(
+                  leading: _isExporting
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.ios_share_outlined),
+                  title: Text(tr(context, el: 'Εξαγωγή σημείωσης', en: 'Export note')),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (widget.existingNoteId != null)
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
+                    title: Text(
+                      tr(context, el: 'Διαγραφή', en: 'Delete'),
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -780,31 +792,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       else _togglePrefix('${'#' * level} ');
                     },
                   ),
-                  _tb(Icons.format_bold, () => _toggleWrap('**', '**'), tip: 'Έντονο', active: _selectionWrapped('**', '**')),
-                  _tb(Icons.format_italic, () => _toggleWrap('*', '*'), tip: 'Πλάγιο', active: _selectionWrapped('*', '*')),
-                  _tb(Icons.format_underlined, () => _toggleWrap('<u>', '</u>'), tip: 'Υπογράμμιση', active: _selectionWrapped('<u>', '</u>')),
-                  _tb(Icons.format_strikethrough, () => _toggleWrap('~~', '~~'), tip: 'Διαγραφή', active: _selectionWrapped('~~', '~~')),
+                  _tb(Icons.format_bold, () => _toggleWrap('**', '**'), tip: tr(context, el: 'Έντονο', en: 'Bold'), active: _selectionWrapped('**', '**')),
+                  _tb(Icons.format_italic, () => _toggleWrap('*', '*'), tip: tr(context, el: 'Πλάγιο', en: 'Italic'), active: _selectionWrapped('*', '*')),
+                  _tb(Icons.format_underlined, () => _toggleWrap('<u>', '</u>'), tip: tr(context, el: 'Υπογράμμιση', en: 'Underline'), active: _selectionWrapped('<u>', '</u>')),
+                  _tb(Icons.format_strikethrough, () => _toggleWrap('~~', '~~'), tip: tr(context, el: 'Διαγραφή', en: 'Strikethrough'), active: _selectionWrapped('~~', '~~')),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
-                  _tb(Icons.format_list_bulleted, () => _togglePrefix('- '), tip: 'Bullet list'),
-                  _tb(Icons.format_list_numbered, () => _togglePrefix('1. '), tip: 'Αριθμημένη'),
-                  _tb(Icons.check_box_outlined, () => _togglePrefix('- [ ] '), tip: 'Task list'),
+                  _tb(Icons.format_list_bulleted, () => _togglePrefix('- '), tip: tr(context, el: 'Λίστα', en: 'Bullet list')),
+                  _tb(Icons.format_list_numbered, () => _togglePrefix('1. '), tip: tr(context, el: 'Αριθμημένη λίστα', en: 'Numbered list')),
+                  _tb(Icons.check_box_outlined, () => _togglePrefix('- [ ] '), tip: tr(context, el: 'Λίστα εργασιών', en: 'Task list')),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
-                  _tb(Icons.code, () => _toggleWrap('`', '`'), tip: 'Inline κώδικας', active: _selectionWrapped('`', '`')),
-                  _tb(Icons.data_object, () => _toggleWrap('\n```\n', '\n```\n'), tip: 'Block κώδικα'),
-                  _tb(Icons.format_quote, () => _togglePrefix('> '), tip: 'Παράθεση'),
+                  _tb(Icons.code, () => _toggleWrap('`', '`'), tip: tr(context, el: 'Inline κώδικας', en: 'Inline code'), active: _selectionWrapped('`', '`')),
+                  _tb(Icons.data_object, () => _toggleWrap('\n```\n', '\n```\n'), tip: tr(context, el: 'Block κώδικα', en: 'Code block')),
+                  _tb(Icons.format_quote, () => _togglePrefix('> '), tip: tr(context, el: 'Παράθεση', en: 'Quote')),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
-                  _tb(Icons.image_outlined, _insertImage, tip: 'Εικόνα'),
-                  _tb(Icons.draw_outlined, _openDrawing, tip: 'Σχέδιο'),
-                  _tb(Icons.emoji_emotions_outlined, _insertClipArt, tip: 'Clip art'),
-                  _tb(Icons.layers_outlined, _drawOverEverything, tip: 'Ζωγραφική πάνω σε όλα (πάνω layer)'),
+                  _tb(Icons.image_outlined, _insertImage, tip: tr(context, el: 'Εικόνα', en: 'Image')),
+                  _tb(Icons.draw_outlined, _openDrawing, tip: tr(context, el: 'Σχέδιο', en: 'Drawing')),
+                  _tb(Icons.emoji_emotions_outlined, _insertClipArt, tip: tr(context, el: 'Clip art', en: 'Clip art')),
+                  _tb(Icons.layers_outlined, _drawOverEverything, tip: tr(context, el: 'Ζωγραφική πάνω σε όλα (πάνω layer)', en: 'Draw over everything (top layer)')),
                   if (_overlayBytes != null)
-                    _tb(Icons.layers_clear_outlined, _clearOverlay, tip: 'Διαγραφή επιπέδου ζωγραφικής'),
+                    _tb(Icons.layers_clear_outlined, _clearOverlay, tip: tr(context, el: 'Διαγραφή επιπέδου ζωγραφικής', en: 'Delete drawing layer')),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
@@ -826,8 +838,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
-                  _tb(Icons.undo, _undo, tip: 'Αναίρεση', active: _historyIndex > 0),
-                  _tb(Icons.redo, _redo, tip: 'Επαναφορά', active: _historyIndex < _history.length - 1),
+                  _tb(Icons.undo, _undo, tip: tr(context, el: 'Αναίρεση', en: 'Undo'), active: _historyIndex > 0),
+                  _tb(Icons.redo, _redo, tip: tr(context, el: 'Επαναφορά', en: 'Redo'), active: _historyIndex < _history.length - 1),
                   const SizedBox(width: 8),
                 ]),
               ),
@@ -913,13 +925,88 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Widget _buildPreview() {
     final text = _bodyController.text;
     if (text.trim().isEmpty) {
-      return const Center(child: Text('(κενή σημείωση)', style: TextStyle(color: Colors.grey)));
+      return Center(child: Text(tr(context, el: '(κενή σημείωση)', en: '(empty note)'), style: const TextStyle(color: Colors.grey)));
     }
     return LayoutBuilder(
       builder: (context, constraints) {
         _previewViewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         final availableWidth = constraints.maxWidth - 32; // πλάτος μείον padding
-        return GestureDetector(
+        return Stack(
+          children: [
+            _buildPreviewInteractiveArea(availableWidth),
+            // ── Floating πάνελ ζουμ / ζωγραφικής ────────────────────────
+            // Ζήτημα που διορθώθηκε: αυτά τα κουμπιά ήταν πριν στο AppBar
+            // και ξεχείλιζαν πάνω στο κουμπί «πίσω» σε μικρές οθόνες. Εδώ
+            // επιπλέουν πάνω από το περιεχόμενο, σε κατακόρυφη στήλη,
+            // οπότε χωράνε πάντα ανεξαρτήτως πλάτους οθόνης.
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: _buildFloatingPreviewPanel(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFloatingPreviewPanel() {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(24),
+      color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.zoom_in),
+            tooltip: tr(context, el: 'Μεγέθυνση', en: 'Zoom in'),
+            onPressed: () => _applyZoom(1.25),
+          ),
+          InkWell(
+            onTap: _resetZoom,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text('${(_zoomLevel * 100).round()}%',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_out),
+            tooltip: tr(context, el: 'Σμίκρυνση', en: 'Zoom out'),
+            onPressed: () => _applyZoom(1 / 1.25),
+          ),
+          if (_zoomLevel != 1.0)
+            IconButton(
+              icon: const Icon(Icons.zoom_out_map),
+              tooltip: tr(context, el: 'Επαναφορά ζουμ', en: 'Reset zoom'),
+              onPressed: _resetZoom,
+            ),
+          const Divider(height: 1),
+          if (_overlayBytes != null)
+            IconButton(
+              icon: Icon(_overlayVisible ? Icons.gesture : Icons.gesture_outlined,
+                  color: _overlayVisible ? Theme.of(context).colorScheme.primary : null),
+              tooltip: _overlayVisible
+                  ? tr(context, el: 'Απόκρυψη ζωγραφιάς', en: 'Hide drawing')
+                  : tr(context, el: 'Εμφάνιση ζωγραφιάς', en: 'Show drawing'),
+              onPressed: () => setState(() => _overlayVisible = !_overlayVisible),
+            ),
+          IconButton(
+            icon: _isFlatteningDrawing
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.layers_outlined),
+            tooltip: tr(context, el: 'Ζωγραφική πάνω σε όλα', en: 'Draw over everything'),
+            onPressed: _isFlatteningDrawing ? null : _drawOverEverything,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewInteractiveArea(double availableWidth) {
+    return GestureDetector(
           onDoubleTapDown: (d) => _lastDoubleTapDetails = d,
           onDoubleTap: () {
             if (_lastDoubleTapDetails != null) _handleDoubleTap(_lastDoubleTapDetails!);
@@ -1033,7 +1120,5 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
           ),
         );
-      },
-    );
   }
 }

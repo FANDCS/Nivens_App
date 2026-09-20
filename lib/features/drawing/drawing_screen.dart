@@ -3,18 +3,22 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:scribble/scribble.dart';
+import '../../core/i18n.dart';
 
 class DrawingResult {
   final Uint8List pngBytes;
   DrawingResult({required this.pngBytes});
 }
 
+/// Τρόπος σχεδίασης.
+enum _Tool { pen, brush, eraser }
+
 class DrawingScreen extends StatefulWidget {
   final String? title;
+
   /// Προαιρετικό στιγμιότυπο (PNG) που εμφανίζεται ΚΑΤΩ από τον διάφανο
   /// καμβά σχεδίασης, ώστε ο χρήστης να ζωγραφίζει ΠΑΝΩ από ήδη υπάρχον
-  /// περιεχόμενο (π.χ. όλη η σημείωση). Το αποτέλεσμα (background +
-  /// σχέδιο) επιστρέφεται ήδη "flattened" σε ένα ενιαίο PNG.
+  /// περιεχόμενο (π.χ. όλη η σημείωση).
   final Uint8List? backgroundImageBytes;
 
   /// Αν true, το PNG που επιστρέφεται περιέχει **μόνο** τις πινελιές, με
@@ -23,7 +27,7 @@ class DrawingScreen extends StatefulWidget {
   /// να μπαίνει ΠΑΝΩ από κείμενο/εικόνες χωρίς να τα «καίει» σε εικόνα.
   final bool transparentResult;
 
-  /// Προαιρετικό υπάρχον overlay PNG — φορτώνεται ως αχνό οδηγό ώστε να
+  /// Προαιρετικό υπάρχον overlay PNG — φορτώνεται ως οδηγός ώστε να
   /// συνεχίσεις μια προηγούμενη ζωγραφιά.
   final Uint8List? existingOverlayBytes;
 
@@ -42,10 +46,19 @@ class DrawingScreen extends StatefulWidget {
 class _DrawingScreenState extends State<DrawingScreen> {
   late ScribbleNotifier _notifier;
   final _repaintKey = GlobalKey();
-  bool _erasing = false;
+  _Tool _tool = _Tool.pen;
   Color _selectedColor = Colors.black;
   double _strokeWidth = 4.0;
   bool _isSaving = false;
+
+  /// Λόγος διαστάσεων (πλάτος/ύψος) που ΠΡΕΠΕΙ να έχει ο καμβάς ώστε οι
+  /// πινελιές να ευθυγραμμίζονται pixel-perfect με το background (και,
+  /// αντίστροφα, με το πού θα εμφανιστούν ξανά μέσα στη σημείωση). Χωρίς
+  /// αυτό, ο καμβάς γέμιζε όλη την οθόνη (StackFit.expand) ενώ το
+  /// background εμφανιζόταν με "letterboxing" (BoxFit.contain) — δύο
+  /// διαφορετικοί χώροι συντεταγμένων, άρα ό,τι ζωγράφιζες εμφανιζόταν
+  /// μετατοπισμένο όταν επέστρεφε στην Προβολή.
+  double? _canvasAspectRatio;
 
   static const _palette = [
     Colors.black, Colors.white, Colors.red, Colors.orange,
@@ -57,14 +70,38 @@ class _DrawingScreenState extends State<DrawingScreen> {
   @override
   void initState() {
     super.initState();
-    // scribble 0.10.x API — χωρίς widthRange στον constructor
     _notifier = ScribbleNotifier();
-    _applyPen();
+    _applyTool();
+    _resolveAspectRatio();
   }
 
-  void _applyPen() {
-    _notifier.setColor(_selectedColor);
-    _notifier.setStrokeWidth(_strokeWidth);
+  /// Βρίσκει τις πραγματικές διαστάσεις του background/overlay ώστε ο
+  /// καμβάς να «κλειδώσει» στην ίδια αναλογία.
+  Future<void> _resolveAspectRatio() async {
+    final bytes = widget.backgroundImageBytes ?? widget.existingOverlayBytes;
+    if (bytes == null) return;
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final ratio = frame.image.width / frame.image.height;
+    frame.image.dispose();
+    if (mounted) setState(() => _canvasAspectRatio = ratio);
+  }
+
+  void _applyTool() {
+    switch (_tool) {
+      case _Tool.pen:
+        _notifier.setColor(_selectedColor.withOpacity(1.0));
+        _notifier.setStrokeWidth(_strokeWidth);
+        break;
+      case _Tool.brush:
+        // Πιο «μαλακή» πινελιά: μεγαλύτερο πάχος, μερική διαφάνεια.
+        _notifier.setColor(_selectedColor.withOpacity(0.55));
+        _notifier.setStrokeWidth(_strokeWidth * 2.2);
+        break;
+      case _Tool.eraser:
+        _notifier.setEraser();
+        break;
+    }
   }
 
   @override
@@ -73,20 +110,22 @@ class _DrawingScreenState extends State<DrawingScreen> {
     super.dispose();
   }
 
+  void _selectTool(_Tool t) {
+    setState(() => _tool = t);
+    _applyTool();
+  }
+
   void _setColor(Color c) {
-    setState(() { _selectedColor = c; _erasing = false; });
-    _notifier.setColor(c);
+    setState(() {
+      _selectedColor = c;
+      if (_tool == _Tool.eraser) _tool = _Tool.pen;
+    });
+    _applyTool();
   }
 
   void _setStroke(double w) {
     setState(() => _strokeWidth = w);
-    _notifier.setStrokeWidth(w);
-    if (_erasing) _notifier.setEraser();
-  }
-
-  void _toggleEraser() {
-    setState(() => _erasing = !_erasing);
-    if (_erasing) { _notifier.setEraser(); } else { _notifier.setColor(_selectedColor); }
+    _applyTool();
   }
 
   /// Αποδίδει το canvas σε PNG χρησιμοποιώντας RepaintBoundary.
@@ -110,62 +149,71 @@ class _DrawingScreenState extends State<DrawingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final needsAspectLock = widget.transparentResult &&
+        (widget.backgroundImageBytes != null || widget.existingOverlayBytes != null);
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
       appBar: AppBar(
-        title: Text(widget.title ?? 'Σχέδιο'),
+        title: Text(widget.title ?? tr(context, el: 'Σχέδιο', en: 'Drawing')),
         actions: [
-          IconButton(icon: const Icon(Icons.undo), tooltip: 'Αναίρεση', onPressed: () => _notifier.undo()),
-          IconButton(icon: const Icon(Icons.redo), tooltip: 'Επαναφορά', onPressed: () => _notifier.redo()),
-          IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Καθαρισμός', onPressed: () => _notifier.clear()),
+          IconButton(
+            icon: const Icon(Icons.undo),
+            tooltip: tr(context, el: 'Αναίρεση', en: 'Undo'),
+            onPressed: () => _notifier.undo(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.redo),
+            tooltip: tr(context, el: 'Επαναφορά', en: 'Redo'),
+            onPressed: () => _notifier.redo(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: tr(context, el: 'Καθαρισμός', en: 'Clear'),
+            onPressed: () => _notifier.clear(),
+          ),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.check),
-            tooltip: 'Αποθήκευση',
+            tooltip: tr(context, el: 'Αποθήκευση', en: 'Save'),
             onPressed: _isSaving ? null : _save,
           ),
         ],
       ),
       body: Column(
         children: [
-          // ── Canvas ─────────────────────────────────────────────────────────
-          // Αν υπάρχει background (π.χ. "ζωγραφική πάνω σε όλα"), μπαίνει από
-          // κάτω· ο διάφανος καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer,
-          // άρα ό,τι ζωγραφίζεις εμφανίζεται πάνω από όλα τα υπόλοιπα.
+          // ── Canvas ─────────────────────────────────────────────────────
+          // Ο καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer· ό,τι
+          // ζωγραφίζεις εμφανίζεται πάνω από ό,τι υπάρχει από κάτω.
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Το background μπαίνει ΕΚΤΟΣ του RepaintBoundary όταν
-                // ζητάμε διάφανο αποτέλεσμα (overlay layer).
-                if (widget.backgroundImageBytes != null && widget.transparentResult)
-                  Positioned.fill(
-                    child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
+            child: (needsAspectLock && _canvasAspectRatio == null)
+                ? const Center(child: CircularProgressIndicator())
+                : Center(
+                    child: needsAspectLock
+                        ? AspectRatio(
+                            aspectRatio: _canvasAspectRatio!,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Οδηγός φόντου (π.χ. η σημείωση όπως
+                                // φαίνεται στην Προβολή) — ΜΟΝΟ για
+                                // αναφορά ενώ ζωγραφίζεις. Είναι ΕΚΤΟΣ
+                                // του RepaintBoundary, άρα δεν μπαίνει
+                                // στο τελικό διάφανο PNG.
+                                if (widget.backgroundImageBytes != null)
+                                  Positioned.fill(
+                                    child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.fill),
+                                  ),
+                                _buildLayers(),
+                              ],
+                            ),
+                          )
+                        : _buildLayers(),
                   ),
-                if (widget.existingOverlayBytes != null && widget.transparentResult)
-                  Positioned.fill(
-                    child: Image.memory(widget.existingOverlayBytes!, fit: BoxFit.contain),
-                  ),
-                RepaintBoundary(
-                  key: _repaintKey,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (widget.backgroundImageBytes != null && !widget.transparentResult)
-                        Positioned.fill(
-                          child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
-                        ),
-                      // Ο καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer.
-                      Scribble(notifier: _notifier, drawPen: true),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
 
-          // ── Toolbar ────────────────────────────────────────────────────────
+          // ── Toolbar ────────────────────────────────────────────────────
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -174,66 +222,83 @@ class _DrawingScreenState extends State<DrawingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Χρωματική παλέτα
+                // Εργαλείο: Στυλό / Βούρτσα / Γόμα
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: Row(children: [
+                    Expanded(
+                      child: _toolButton(
+                        _Tool.pen,
+                        Icons.edit_outlined,
+                        tr(context, el: 'Στυλό', en: 'Pen'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _toolButton(
+                        _Tool.brush,
+                        Icons.brush_outlined,
+                        tr(context, el: 'Βούρτσα', en: 'Brush'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _toolButton(
+                        _Tool.eraser,
+                        Icons.auto_fix_normal_outlined,
+                        tr(context, el: 'Γόμα', en: 'Eraser'),
+                      ),
+                    ),
+                  ]),
+                ),
+                // Χρωματική παλέτα (ανενεργή όταν είναι επιλεγμένη η γόμα)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   child: Row(children: [
-                    // Eraser
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: _toggleEraser,
-                        child: Container(
-                          width: 32, height: 32,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _erasing ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
-                              width: _erasing ? 3 : 1.5,
-                            ),
-                          ),
-                          child: const Icon(Icons.auto_fix_normal, size: 18),
-                        ),
-                      ),
-                    ),
-                    // Palette
                     for (final color in _palette)
                       GestureDetector(
-                        onTap: () => _setColor(color),
-                        child: Container(
-                          width: 30, height: 30,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: color,
-                            border: Border.all(
-                              color: (!_erasing && _selectedColor.value == color.value)
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).dividerColor,
-                              width: (!_erasing && _selectedColor.value == color.value) ? 3 : 1,
+                        onTap: _tool == _Tool.eraser ? null : () => _setColor(color),
+                        child: Opacity(
+                          opacity: _tool == _Tool.eraser ? 0.35 : 1.0,
+                          child: Container(
+                            width: 30, height: 30,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color,
+                              border: Border.all(
+                                color: (_tool != _Tool.eraser && _selectedColor.value == color.value)
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).dividerColor,
+                                width: (_tool != _Tool.eraser && _selectedColor.value == color.value) ? 3 : 1,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    // Custom color picker
                     const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: () async {
-                        final picked = await _showRgbPicker();
-                        if (picked != null) _setColor(picked);
-                      },
-                      child: Container(
-                        width: 30, height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const SweepGradient(colors: [
-                            Colors.red, Colors.orange, Colors.yellow,
-                            Colors.green, Colors.blue, Colors.purple, Colors.red,
-                          ]),
-                          border: Border.all(color: Theme.of(context).dividerColor),
+                      onTap: _tool == _Tool.eraser
+                          ? null
+                          : () async {
+                              final picked = await _showRgbPicker();
+                              if (picked != null) _setColor(picked);
+                            },
+                      child: Opacity(
+                        opacity: _tool == _Tool.eraser ? 0.35 : 1.0,
+                        child: Container(
+                          width: 30, height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const SweepGradient(colors: [
+                              Colors.red, Colors.orange, Colors.yellow,
+                              Colors.green, Colors.blue, Colors.purple, Colors.red,
+                            ]),
+                            border: Border.all(color: Theme.of(context).dividerColor),
+                          ),
+                          child: const Icon(Icons.add, size: 14, color: Colors.white),
                         ),
-                        child: const Icon(Icons.add, size: 14, color: Colors.white),
                       ),
                     ),
                   ]),
@@ -243,7 +308,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
                   child: Row(children: [
-                    const Icon(Icons.brush, size: 16),
+                    const Icon(Icons.line_weight, size: 16),
                     const SizedBox(width: 6),
                     for (final size in _strokeSizes)
                       GestureDetector(
@@ -264,7 +329,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
                               height: size.clamp(3, 26),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: _erasing ? Theme.of(context).dividerColor : _selectedColor,
+                                color: _tool == _Tool.eraser ? Theme.of(context).dividerColor : _selectedColor,
                               ),
                             ),
                           ),
@@ -280,6 +345,53 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
+  Widget _toolButton(_Tool tool, IconData icon, String label) {
+    final selected = _tool == tool;
+    return OutlinedButton.icon(
+      onPressed: () => _selectTool(tool),
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontSize: 13)),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: selected ? Theme.of(context).colorScheme.primaryContainer : null,
+        foregroundColor: selected ? Theme.of(context).colorScheme.onPrimaryContainer : null,
+        side: BorderSide(
+          color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
+          width: selected ? 2 : 1,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+    );
+  }
+
+  /// Τα layers του καμβά: background (μόνο αν ΔΕΝ ζητήθηκε διάφανο
+  /// αποτέλεσμα), υπάρχον overlay (οδηγός), και ο καμβάς σχεδίασης —
+  /// όλα μέσα στο ΙΔΙΟ RepaintBoundary/κουτί, ώστε να ταιριάζουν ακριβώς
+  /// σε θέση και μέγεθος με ό,τι θα φανεί ξανά στην Προβολή.
+  Widget _buildLayers() {
+    return RepaintBoundary(
+      key: _repaintKey,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Bake-in mode (transparentResult == false): το background
+          // ΜΠΑΙΝΕΙ μέσα στο αποτέλεσμα. Δεν χρησιμοποιείται σήμερα από
+          // την εφαρμογή, αλλά μένει διαθέσιμο για μελλοντική χρήση.
+          if (widget.backgroundImageBytes != null && !widget.transparentResult)
+            Positioned.fill(
+              child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.fill),
+            ),
+          // Το προηγούμενο overlay ΜΠΑΙΝΕΙ στο αποτέλεσμα (συσσωρευτική
+          // ζωγραφική: οι παλιές πινελιές μένουν, προστίθενται νέες).
+          if (widget.existingOverlayBytes != null)
+            Positioned.fill(
+              child: Image.memory(widget.existingOverlayBytes!, fit: BoxFit.fill),
+            ),
+          Scribble(notifier: _notifier, drawPen: true),
+        ],
+      ),
+    );
+  }
+
   Future<Color?> _showRgbPicker() {
     Color temp = _selectedColor;
     return showDialog<Color>(
@@ -290,7 +402,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
           int g = (temp.value >> 8) & 0xFF;
           int b = temp.value & 0xFF;
           return AlertDialog(
-            title: const Text('Επιλογή χρώματος'),
+            title: Text(tr(context, el: 'Επιλογή χρώματος', en: 'Pick a color')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -302,8 +414,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Άκυρο')),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(temp), child: const Text('ΟΚ')),
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(temp), child: const Text('OK')),
             ],
           );
         },
