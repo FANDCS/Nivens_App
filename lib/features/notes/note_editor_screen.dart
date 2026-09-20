@@ -933,7 +933,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         final availableWidth = constraints.maxWidth - 32; // πλάτος μείον padding
         return Stack(
           children: [
-            _buildPreviewInteractiveArea(availableWidth),
+            _buildPreviewInteractiveArea(constraints.maxWidth, availableWidth),
             // ── Floating πάνελ ζουμ / ζωγραφικής ────────────────────────
             // Ζήτημα που διορθώθηκε: αυτά τα κουμπιά ήταν πριν στο AppBar
             // και ξεχείλιζαν πάνω στο κουμπί «πίσω» σε μικρές οθόνες. Εδώ
@@ -1005,7 +1005,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
-  Widget _buildPreviewInteractiveArea(double availableWidth) {
+  Widget _buildPreviewInteractiveArea(double totalWidth, double availableWidth) {
     return GestureDetector(
           onDoubleTapDown: (d) => _lastDoubleTapDetails = d,
           onDoubleTap: () {
@@ -1025,7 +1025,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             if ((z - _zoomLevel).abs() > 0.01) setState(() => _zoomLevel = z);
           },
           child: SizedBox(
-            width: constraints.maxWidth,
+            width: totalWidth,
             child: SingleChildScrollView(
             child: RepaintBoundary(
               key: _previewRepaintKey,
@@ -1037,7 +1037,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 color: Theme.of(context).scaffoldBackgroundColor,
                 padding: const EdgeInsets.all(16),
                 child: MarkdownBody(
-                  data: text,
+                  data: _bodyController.text,
                   selectable: true,
                   extensionSet: md.ExtensionSet.gitHubFlavored,
                   imageBuilder: (uri, title, alt) {
