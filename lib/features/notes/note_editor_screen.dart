@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
@@ -21,8 +22,11 @@ import '../export/export_service.dart';
 import '../export/export_password_dialog.dart';
 import '../export/export_format_menu.dart';
 import '../export/qr_export_dialog.dart';
+import '../export/termbin_service.dart';
+import '../import/docx_reader.dart';
 import '../pdf/pdf_viewer_screen.dart';
 import 'models/note.dart';
+import 'note_fonts.dart';
 
 /// Regex που ταιριάζει markdown εικόνα με προαιρετικό attribute μεγέθους:
 /// ![alt](path "w=NN")  → NN = πλάτος ως ποσοστό (%) του διαθέσιμου χώρου.
@@ -67,6 +71,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final TransformationController _zoomController = TransformationController();
   final GlobalKey _previewRepaintKey = GlobalKey();
   bool _isFlatteningDrawing = false;
+  double _zoomLevel = 1.0;
+
+  /// Bytes του overlay (ζωγραφιά πάνω από όλα) — κρατιούνται στη μνήμη για
+  /// γρήγορη απόδοση στο Stack της Προβολής.
+  Uint8List? _overlayBytes;
+
+  /// Προσωρινή απόκρυψη του overlay (π.χ. για να δεις τι κρύβει από κάτω).
+  bool _overlayVisible = true;
+
+  static const double _minZoom = 0.5;
+  static const double _maxZoom = 8.0;
+  Size _previewViewportSize = Size.zero;
+  TapDownDetails? _lastDoubleTapDetails;
 
   // ── Undo/Redo history ───────────────────────────────────────────────────────
   final List<String> _history = [''];
@@ -129,8 +146,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     } else {
       _note = NoteDocument(title: '');
     }
+    await _loadOverlay();
     _history[0] = _bodyController.text;
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadOverlay() async {
+    final path = _note?.overlayPath;
+    if (path == null) { _overlayBytes = null; return; }
+    try {
+      final f = File(path);
+      _overlayBytes = await f.exists() ? await f.readAsBytes() : null;
+    } catch (_) {
+      _overlayBytes = null;
+    }
   }
 
   Future<void> _save() async {
@@ -307,19 +336,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// "Ζωγραφική πάνω σε όλα": τραβάει στιγμιότυπο ΟΛΟΥ του αποδοσμένου
   /// περιεχομένου (κείμενο + εικόνες όπως φαίνονται στην Προβολή) και το
-  /// περνάει ως φόντο στην οθόνη σχεδίασης, ώστε να ζωγραφίζεις ΠΑΝΩ από
-  /// ό,τι υπάρχει ήδη. Το αποτέλεσμα μπαίνει σαν ενιαία εικόνα στην αρχή
-  /// της σημείωσης, δηλαδή στο υψηλότερο (πρώτο) layer κατά την προβολή.
+  /// περνάει ως ΦΟΝΤΟ στην οθόνη σχεδίασης. Ό,τι ζωγραφίσεις αποθηκεύεται
+  /// ως ξεχωριστό PNG με ΔΙΑΦΑΝΟ φόντο (overlay layer) και αποδίδεται
+  /// πάντα στο ΥΨΗΛΟΤΕΡΟ επίπεδο της Προβολής — πάνω από κείμενο και
+  /// πολυμέσα — χωρίς να αλλοιώνει το markdown της σημείωσης.
   Future<void> _drawOverEverything() async {
     if (!_previewMode) {
       setState(() => _previewMode = true);
       // Δώσε ένα frame να χτιστεί η Προβολή πριν το snapshot.
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 60));
     }
     setState(() => _isFlatteningDrawing = true);
     Uint8List? background;
     try {
-      final boundary = _previewRepaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _previewRepaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary != null) {
         final image = await boundary.toImage(pixelRatio: 2.0);
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -333,17 +364,52 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (!mounted) return;
     final result = await Navigator.of(context).push<DrawingResult>(
       MaterialPageRoute(
-        builder: (_) => DrawingScreen(title: 'Ζωγραφική πάνω σε όλα', backgroundImageBytes: background),
+        builder: (_) => DrawingScreen(
+          title: 'Ζωγραφική πάνω σε όλα',
+          backgroundImageBytes: background,
+          existingOverlayBytes: _overlayBytes,
+          transparentResult: true,
+        ),
         fullscreenDialog: true,
       ),
     );
     if (result == null || !mounted) return;
     final dir = await NivensFolder.sub('drawings');
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final imgFile = File(p.join(dir.path, 'overlay_$ts.png'));
+    final imgFile = File(p.join(dir.path, 'overlay_${_note!.id}_$ts.png'));
     await imgFile.writeAsBytes(result.pngBytes);
-    // Μπαίνει στην ΑΡΧΗ του σώματος → εμφανίζεται πρώτο/από πάνω σε όλα.
-    _bodyController.text = '![σχέδιο πάνω σε όλα](${imgFile.path} "w=100")\n\n${_bodyController.text}';
+    // ΔΕΝ μπαίνει στο markdown: αποθηκεύεται ως ξεχωριστό, διάφανο layer
+    // που ζωγραφίζεται ΠΑΝΩ από κείμενο και πολυμέσα στην Προβολή.
+    setState(() {
+      _note!.overlayPath = imgFile.path;
+      _overlayBytes = result.pngBytes;
+      _overlayVisible = true;
+    });
+  }
+
+  Future<void> _clearOverlay() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Διαγραφή ζωγραφιάς'),
+        content: const Text('Να αφαιρεθεί το επίπεδο ζωγραφικής από τη σημείωση;'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Διαγραφή')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _note!.overlayPath = null;
+      _overlayBytes = null;
+    });
+  }
+
+  Future<void> _pickFont() async {
+    final chosen = await showFontPicker(context: context, current: _note!.font);
+    if (chosen == null || !mounted) return;
+    setState(() => _note!.font = chosen);
   }
 
   Future<void> _insertClipArt() async {
@@ -411,7 +477,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Future<void> _importFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['md', 'txt', 'json', 'pdf'],
+      allowedExtensions: ['md', 'txt', 'json', 'pdf', 'docx', 'rtf'],
     );
     if (result == null || result.files.isEmpty) return;
     final file = File(result.files.single.path!);
@@ -438,6 +504,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         }
         doc.dispose();
         content = buf.toString();
+      } else if (ext == 'docx') {
+        final docx = await DocxReader.readFile(file);
+        content = docx.markdownWithImages;
+        if (_titleController.text.trim().isEmpty) {
+          _titleController.text = p.basenameWithoutExtension(file.path);
+        }
+      } else if (ext == 'doc') {
+        throw const FormatException(
+            'Το παλιό .doc (Word 97-2003) δεν υποστηρίζεται — αποθήκευσέ το ως .docx');
       } else if (ext == 'json') {
         final raw = await file.readAsString();
         final decoded = jsonDecode(raw);
@@ -469,6 +544,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         if (mounted) showQrExportDialog(context: context, data: content);
         return;
       }
+      if (choice.format == ExportFormat.termbin) {
+        await _uploadToTermbin();
+        return;
+      }
       final ext = choice.format == ExportFormat.json ? 'json' : 'md';
       if (!choice.encrypted) {
         final path = await ExportService().exportPlainFile(content: content, filename: '$safeTitle.$ext');
@@ -486,6 +565,58 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Εξήχθη: $path')));
     } finally {
       if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  /// Ανεβάζει τη σημείωση (ως αρχείο markdown με front-matter) στο
+  /// termbin.com και επιστρέφει δημόσιο link.
+  Future<void> _uploadToTermbin() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ανέβασμα στο termbin.com'),
+        content: const Text(
+          'Η σημείωση θα σταλεί ΧΩΡΙΣ κρυπτογράφηση σε δημόσιο pastebin. '
+          'Όποιος έχει το link μπορεί να τη διαβάσει. Συνέχεια;',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Ανέβασμα')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Στέλνουμε ολόκληρο το αρχείο σημείωσης (front-matter + σώμα), ώστε
+    // να μπορεί να γίνει ξανά import από την εφαρμογή.
+    _note!.title = _titleController.text.trim().isEmpty ? 'Χωρίς τίτλο' : _titleController.text.trim();
+    _note!.body = _bodyController.text;
+    try {
+      final url = await TermbinService.upload(_note!.toMarkdownFile());
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ανέβηκε στο termbin'),
+          content: SelectableText(url),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: url));
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Αντιγραφή link'),
+            ),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Κλείσιμο')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Αποτυχία ανεβάσματος: $e')),
+        );
+      }
     }
   }
 
@@ -532,7 +663,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             IconButton(
               icon: const Icon(Icons.zoom_out),
               tooltip: 'Σμίκρυνση',
-              onPressed: () => _applyZoom(0.8),
+              onPressed: () => _applyZoom(1 / 1.25),
+            ),
+            // Ποσοστό ζουμ — πάτημα = επαναφορά στο 100%
+            InkWell(
+              onTap: _resetZoom,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text('${(_zoomLevel * 100).round()}%',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.zoom_in),
@@ -541,9 +682,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.zoom_out_map),
-              tooltip: 'Επαναφορά ζουμ',
-              onPressed: () => _zoomController.value = Matrix4.identity(),
+              tooltip: 'Επαναφορά ζουμ (ή διπλό πάτημα στη σελίδα)',
+              onPressed: _resetZoom,
             ),
+            if (_overlayBytes != null)
+              IconButton(
+                icon: Icon(_overlayVisible ? Icons.gesture : Icons.gesture_outlined,
+                    color: _overlayVisible ? Theme.of(context).colorScheme.primary : null),
+                tooltip: _overlayVisible ? 'Απόκρυψη ζωγραφιάς' : 'Εμφάνιση ζωγραφιάς',
+                onPressed: () => setState(() => _overlayVisible = !_overlayVisible),
+              ),
             IconButton(
               icon: _isFlatteningDrawing
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -654,7 +802,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   _tb(Icons.image_outlined, _insertImage, tip: 'Εικόνα'),
                   _tb(Icons.draw_outlined, _openDrawing, tip: 'Σχέδιο'),
                   _tb(Icons.emoji_emotions_outlined, _insertClipArt, tip: 'Clip art'),
-                  _tb(Icons.layers_outlined, _drawOverEverything, tip: 'Ζωγραφική πάνω σε όλα'),
+                  _tb(Icons.layers_outlined, _drawOverEverything, tip: 'Ζωγραφική πάνω σε όλα (πάνω layer)'),
+                  if (_overlayBytes != null)
+                    _tb(Icons.layers_clear_outlined, _clearOverlay, tip: 'Διαγραφή επιπέδου ζωγραφικής'),
+                  const SizedBox(width: 4),
+                  Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
+                  const SizedBox(width: 4),
+                  // Γραμματοσειρά σημείωσης
+                  InkWell(
+                    onTap: _pickFont,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.font_download_outlined, size: 20),
+                        const SizedBox(width: 6),
+                        Text(_note!.font,
+                            style: NoteFonts.style(_note!.font, const TextStyle(fontSize: 13))),
+                        const Icon(Icons.arrow_drop_down, size: 18),
+                      ]),
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
@@ -686,7 +854,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         maxLines: null,
         expands: true,
         textAlignVertical: TextAlignVertical.top,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 14, height: 1.5),
+        style: NoteFonts.style(
+          _note!.font,
+          const TextStyle(fontSize: 15, height: 1.5),
+        ),
         decoration: const InputDecoration(
           hintText: '# Γράψε σε markdown...',
           border: InputBorder.none,
@@ -695,10 +866,45 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
+  /// Ζουμ γύρω από το κέντρο της οθόνης (διατηρεί το σημείο εστίασης).
   void _applyZoom(double factor) {
-    final current = _zoomController.value.clone();
-    final newScale = (current.getMaxScaleOnAxis() * factor).clamp(1.0, 5.0);
-    _zoomController.value = Matrix4.identity()..scale(newScale);
+    final current = _zoomController.value.getMaxScaleOnAxis();
+    final target = (current * factor).clamp(_minZoom, _maxZoom);
+    _setZoom(target);
+  }
+
+  void _setZoom(double target) {
+    final current = _zoomController.value.getMaxScaleOnAxis();
+    if ((target - current).abs() < 0.001) return;
+    // Κρατάμε το κέντρο του viewport σταθερό όσο αλλάζει η κλίμακα.
+    final size = _previewViewportSize;
+    final focal = Offset(size.width / 2, size.height / 2);
+    final translation = _zoomController.value.getTranslation();
+    final scene = (focal - Offset(translation.x, translation.y)) / current;
+    final newTranslation = focal - scene * target;
+    _zoomController.value = Matrix4.identity()
+      ..translate(newTranslation.dx, newTranslation.dy)
+      ..scale(target);
+    setState(() => _zoomLevel = target);
+  }
+
+  void _resetZoom() {
+    _zoomController.value = Matrix4.identity();
+    setState(() => _zoomLevel = 1.0);
+  }
+
+  /// Διπλό πάτημα: εναλλαγή 100% ↔ 250% στο σημείο που πάτησες.
+  void _handleDoubleTap(TapDownDetails details) {
+    if (_zoomLevel > 1.05) {
+      _resetZoom();
+      return;
+    }
+    const target = 2.5;
+    final focal = details.localPosition;
+    _zoomController.value = Matrix4.identity()
+      ..translate(focal.dx - focal.dx * target, focal.dy - focal.dy * target)
+      ..scale(target);
+    setState(() => _zoomLevel = target);
   }
 
   /// Rendered markdown preview — υποστηρίζει ζουμ (pinch/κουμπιά), local
@@ -711,15 +917,34 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
+        _previewViewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         final availableWidth = constraints.maxWidth - 32; // πλάτος μείον padding
-        return InteractiveViewer(
+        return GestureDetector(
+          onDoubleTapDown: (d) => _lastDoubleTapDetails = d,
+          onDoubleTap: () {
+            if (_lastDoubleTapDetails != null) _handleDoubleTap(_lastDoubleTapDetails!);
+          },
+          child: InteractiveViewer(
           transformationController: _zoomController,
-          minScale: 1.0,
-          maxScale: 5.0,
-          child: SingleChildScrollView(
+          minScale: _minZoom,
+          maxScale: _maxZoom,
+          // Επιτρέπουμε λίγο «αέρα» γύρω-γύρω ώστε να μπορείς να σύρεις
+          // τη σελίδα όταν είσαι ζουμαρισμένος.
+          boundaryMargin: const EdgeInsets.all(200),
+          panEnabled: true,
+          scaleEnabled: true,
+          onInteractionEnd: (_) {
+            final z = _zoomController.value.getMaxScaleOnAxis();
+            if ((z - _zoomLevel).abs() > 0.01) setState(() => _zoomLevel = z);
+          },
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: SingleChildScrollView(
             child: RepaintBoundary(
               key: _previewRepaintKey,
-              child: Container(
+              child: Stack(
+                children: [
+                  Container(
                 // Άσπρο/σκούρο φόντο ώστε το snapshot της "ζωγραφικής πάνω σε
                 // όλα" να μην είναι διάφανο.
                 color: Theme.of(context).scaffoldBackgroundColor,
@@ -759,11 +984,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       child: img,
                     );
                   },
-                  styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                    p: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
-                    h1: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                    h2: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    h3: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  styleSheet: MarkdownStyleSheet.fromTheme(
+                    // Η γραμματοσειρά της σημείωσης εφαρμόζεται σε ΟΛΟ το
+                    // rendered markdown (τίτλοι, παράγραφοι, λίστες...).
+                    Theme.of(context).copyWith(
+                      textTheme: NoteFonts.textTheme(_note!.font, Theme.of(context).textTheme),
+                    ),
+                  ).copyWith(
+                    p: NoteFonts.style(_note!.font,
+                        Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6)),
+                    h1: NoteFonts.style(_note!.font,
+                        Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    h2: NoteFonts.style(_note!.font,
+                        Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    h3: NoteFonts.style(_note!.font,
+                        Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                     code: TextStyle(fontFamily: 'monospace', backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest),
                     codeblockDecoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -775,7 +1010,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   ),
                 ),
               ),
+
+                  // ── OVERLAY LAYER (ζωγραφική) ─────────────────────────
+                  // Μπαίνει ΤΕΛΕΥΤΑΙΟ στο Stack, άρα αποδίδεται ΠΑΝΩ από
+                  // το κείμενο και τα πολυμέσα. Το IgnorePointer αφήνει
+                  // την επιλογή κειμένου / το tap στις εικόνες να δουλεύουν
+                  // κανονικά από κάτω.
+                  if (_overlayBytes != null && _overlayVisible)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Image.memory(
+                          _overlayBytes!,
+                          fit: BoxFit.fill,
+                          gaplessPlayback: true,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
+            ),
+          ),
           ),
         );
       },

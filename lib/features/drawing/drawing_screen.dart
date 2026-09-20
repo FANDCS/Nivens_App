@@ -16,7 +16,24 @@ class DrawingScreen extends StatefulWidget {
   /// περιεχόμενο (π.χ. όλη η σημείωση). Το αποτέλεσμα (background +
   /// σχέδιο) επιστρέφεται ήδη "flattened" σε ένα ενιαίο PNG.
   final Uint8List? backgroundImageBytes;
-  const DrawingScreen({super.key, this.title, this.backgroundImageBytes});
+
+  /// Αν true, το PNG που επιστρέφεται περιέχει **μόνο** τις πινελιές, με
+  /// διάφανο φόντο (το background μένει έξω από το RepaintBoundary).
+  /// Χρησιμοποιείται για το overlay layer της σημείωσης, ώστε η ζωγραφιά
+  /// να μπαίνει ΠΑΝΩ από κείμενο/εικόνες χωρίς να τα «καίει» σε εικόνα.
+  final bool transparentResult;
+
+  /// Προαιρετικό υπάρχον overlay PNG — φορτώνεται ως αχνό οδηγό ώστε να
+  /// συνεχίσεις μια προηγούμενη ζωγραφιά.
+  final Uint8List? existingOverlayBytes;
+
+  const DrawingScreen({
+    super.key,
+    this.title,
+    this.backgroundImageBytes,
+    this.transparentResult = false,
+    this.existingOverlayBytes,
+  });
 
   @override
   State<DrawingScreen> createState() => _DrawingScreenState();
@@ -117,18 +134,34 @@ class _DrawingScreenState extends State<DrawingScreen> {
           // κάτω· ο διάφανος καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer,
           // άρα ό,τι ζωγραφίζεις εμφανίζεται πάνω από όλα τα υπόλοιπα.
           Expanded(
-            child: RepaintBoundary(
-              key: _repaintKey,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (widget.backgroundImageBytes != null)
-                    Positioned.fill(
-                      child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
-                    ),
-                  Scribble(notifier: _notifier, drawPen: true),
-                ],
-              ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Το background μπαίνει ΕΚΤΟΣ του RepaintBoundary όταν
+                // ζητάμε διάφανο αποτέλεσμα (overlay layer).
+                if (widget.backgroundImageBytes != null && widget.transparentResult)
+                  Positioned.fill(
+                    child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
+                  ),
+                if (widget.existingOverlayBytes != null && widget.transparentResult)
+                  Positioned.fill(
+                    child: Image.memory(widget.existingOverlayBytes!, fit: BoxFit.contain),
+                  ),
+                RepaintBoundary(
+                  key: _repaintKey,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (widget.backgroundImageBytes != null && !widget.transparentResult)
+                        Positioned.fill(
+                          child: Image.memory(widget.backgroundImageBytes!, fit: BoxFit.contain),
+                        ),
+                      // Ο καμβάς σχεδίασης είναι πάντα το ΠΙΟ ΨΗΛΟ layer.
+                      Scribble(notifier: _notifier, drawPen: true),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 

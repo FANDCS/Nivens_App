@@ -13,6 +13,7 @@ class ExportChoice {
 Future<ExportChoice?> showExportFormatMenu({
   required BuildContext context,
   bool allowQr = true,
+  bool allowTermbin = true,
 }) async {
   final firstChoice = await showModalBottomSheet<String>(
     context: context,
@@ -46,6 +47,13 @@ Future<ExportChoice?> showExportFormatMenu({
               subtitle: const Text('Απλό, χωρίς κωδικό — μόνο για σύντομες σημειώσεις'),
               onTap: () => Navigator.of(context).pop('qr'),
             ),
+          if (allowTermbin)
+            ListTile(
+              leading: const Icon(Icons.cloud_upload_outlined),
+              title: const Text('Ανέβασμα στο termbin.com'),
+              subtitle: const Text('Δημόσιο link — χωρίς κρυπτογράφηση'),
+              onTap: () => Navigator.of(context).pop('termbin'),
+            ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.folder_zip_outlined),
@@ -63,6 +71,7 @@ Future<ExportChoice?> showExportFormatMenu({
   if (firstChoice == 'markdown') return const ExportChoice(format: ExportFormat.markdown, encrypted: false);
   if (firstChoice == 'json') return const ExportChoice(format: ExportFormat.json, encrypted: false);
   if (firstChoice == 'qr') return const ExportChoice(format: ExportFormat.qr, encrypted: false);
+  if (firstChoice == 'termbin') return const ExportChoice(format: ExportFormat.termbin, encrypted: false);
 
   // firstChoice == 'zip' -> ρώτα ΕΠΙΠΛΕΟΝ ποια μορφή θα μπει μέσα στο zip
   if (!context.mounted) return null;

@@ -4,13 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:syncfusion_flutter_core/core.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'core/encryption/encryption_service.dart';
 import 'core/storage/app_database.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/notes/note_editor_screen.dart';
+import 'features/import/docx_reader.dart';
+import 'features/pdf/pdf_viewer_screen.dart';
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // ενεργοποιείται μετά από flutter pub get + gen
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -27,9 +28,14 @@ const syncfusionLicenseKey = String.fromEnvironment('SYNCFUSION_LICENSE_KEY');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (syncfusionLicenseKey.isNotEmpty) {
-    SyncfusionLicense.registerLicense(syncfusionLicenseKey);
-  }
+  // Η καταχώριση του Syncfusion license έχει μετακινηθεί σε ξεχωριστό
+  // πακέτο (syncfusion_licensing) και ΔΕΝ υπάρχει στο
+  // syncfusion_flutter_core 31.2.18 που χρησιμοποιεί το project. Αν θέλεις
+  // να φύγει το trial banner, πρόσθεσε `syncfusion_licensing` στο
+  // pubspec.yaml και ξε-σχολίασε τις δύο γραμμές (μαζί με το import).
+  // if (syncfusionLicenseKey.isNotEmpty) {
+  //   SyncfusionLicense.registerLicense(syncfusionLicenseKey);
+  // }
   final prefs = await SharedPreferences.getInstance();
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
@@ -143,15 +149,31 @@ class _RootRouterState extends State<_RootRouter> {
   }
 
   Future<void> _checkIncomingIntent() async {
+    // Αρχείο με το οποίο ξεκίνησε η εφαρμογή
     try {
       final path = await _intentChannel.invokeMethod<String?>('getInitialFile');
       if (path != null && mounted) setState(() => _intentFilePath = path);
     } catch (_) {}
+    // Αρχείο που ανοίχτηκε ενώ η εφαρμογή έτρεχε ήδη
+    _intentChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onFileOpened' && call.arguments is String && mounted) {
+        setState(() {
+          _intentFilePath = call.arguments as String;
+          _pdfChoiceMade = false;
+          _pdfViewOnly = false;
+        });
+      }
+      return null;
+    });
   }
 
+  /// Διαβάζει το αρχείο που ήρθε από την εξερεύνηση αρχείων και το
+  /// μετατρέπει σε (τίτλος, περιεχόμενο markdown).
+  /// Υποστηρίζονται: .pdf (εξαγωγή κειμένου), .docx (Word), .md/.txt/άλλα.
   Future<(String, String)?> _readIntentFile(String path) async {
     final file = File(path);
     final ext = path.split('.').last.toLowerCase();
+    final baseName = path.split('/').last.replaceAll(RegExp(r'\.\w+$'), '');
     try {
       if (ext == 'pdf') {
         final bytes = await file.readAsBytes();
@@ -162,12 +184,50 @@ class _RootRouterState extends State<_RootRouter> {
           buf.writeln(extractor.extractText(startPageIndex: i, endPageIndex: i));
         }
         doc.dispose();
-        return (path.split('/').last.replaceAll('.pdf', ''), buf.toString());
+        return (baseName, buf.toString());
+      } else if (ext == 'docx') {
+        final docx = await DocxReader.readFile(file);
+        return (baseName, docx.markdownWithImages);
       } else {
         final content = await file.readAsString();
-        return (path.split('/').last.replaceAll(RegExp(r'\.\w+$'), ''), content);
+        return (baseName, content);
       }
     } catch (_) { return null; }
+  }
+
+  /// Όταν ανοίγει PDF από την εξερεύνηση αρχείων, ρωτάμε αν θέλει
+  /// προβολή του PDF ή εξαγωγή κειμένου σε νέα σημείωση.
+  bool _pdfChoiceMade = false;
+  bool _pdfViewOnly = false;
+
+  Future<void> _askPdfAction() async {
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Άνοιγμα PDF'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop('view'),
+            child: const Row(children: [
+              Icon(Icons.picture_as_pdf_outlined), SizedBox(width: 12), Text('Προβολή ως PDF'),
+            ]),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop('text'),
+            child: const Row(children: [
+              Icon(Icons.note_add_outlined), SizedBox(width: 12), Text('Εξαγωγή κειμένου σε σημείωση'),
+            ]),
+          ),
+        ],
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        _pdfChoiceMade = true;
+        _pdfViewOnly = choice != 'text';
+      });
+    }
   }
 
   @override
@@ -190,6 +250,19 @@ class _RootRouterState extends State<_RootRouter> {
             final db = AppDatabase(AppDatabase.openEncrypted(keySnapshot.data!));
 
             if (_intentFilePath != null) {
+              final isPdf = _intentFilePath!.toLowerCase().endsWith('.pdf');
+              if (isPdf && !_pdfChoiceMade) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!_pdfChoiceMade) _askPdfAction();
+                });
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              if (isPdf && _pdfViewOnly) {
+                return PdfViewerScreen(
+                  filePath: _intentFilePath!,
+                  title: _intentFilePath!.split('/').last,
+                );
+              }
               return FutureBuilder<(String, String)?>(
                 future: _readIntentFile(_intentFilePath!),
                 builder: (context, fileSnapshot) {

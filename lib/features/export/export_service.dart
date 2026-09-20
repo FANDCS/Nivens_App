@@ -7,7 +7,7 @@ import 'package:path/path.dart' as p;
 import '../../core/storage/nivens_folder.dart';
 
 /// Μορφή εξαγωγής για μία σημείωση.
-enum ExportFormat { markdown, json, qr }
+enum ExportFormat { markdown, json, qr, termbin }
 
 /// Δημιουργεί encrypted export αρχεία (.notesbackup): zip στη μνήμη +
 /// AES-256-GCM encryption ολόκληρου του zip με κλειδί που παράγεται

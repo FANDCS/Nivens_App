@@ -14,6 +14,10 @@ class NoteDocument {
   String body;
   List<String> attachmentIds;
 
+  /// Διαδρομή PNG με διάφανο φόντο που ζωγραφίζεται ΠΑΝΩ από όλα
+  /// (κείμενο + εικόνες) στην Προβολή. null = δεν υπάρχει overlay.
+  String? overlayPath;
+
   NoteDocument({
     String? id,
     required this.title,
@@ -23,6 +27,7 @@ class NoteDocument {
     DateTime? updatedAt,
     this.body = '',
     this.attachmentIds = const [],
+    this.overlayPath,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now().toUtc(),
         updatedAt = updatedAt ?? DateTime.now().toUtc();
@@ -36,6 +41,7 @@ class NoteDocument {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'attachmentIds': attachmentIds,
+      'overlay': overlayPath ?? '',
     };
     final yamlStr = YamlWriter().write(frontMatter);
     return '---\n$yamlStr---\n\n$body';
@@ -62,6 +68,9 @@ class NoteDocument {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      overlayPath: (yamlMap['overlay'] as String?)?.isEmpty ?? true
+          ? null
+          : yamlMap['overlay'] as String,
     );
   }
 }
