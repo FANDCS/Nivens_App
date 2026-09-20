@@ -413,6 +413,39 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     setState(() => _note!.font = chosen);
   }
 
+  static const List<double> _fontSizeOptions = [12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32];
+
+  Future<void> _pickFontSize() async {
+    final chosen = await showModalBottomSheet<double>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(tr(ctx, el: 'Μέγεθος γραμματοσειράς', en: 'Font size'),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            ),
+            for (final size in _fontSizeOptions)
+              ListTile(
+                selected: size == _note!.fontSize,
+                leading: Icon(size == _note!.fontSize
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked),
+                title: Text('${size.round()} pt',
+                    style: NoteFonts.style(_note!.font, TextStyle(fontSize: size.clamp(12, 24).toDouble()))),
+                onTap: () => Navigator.of(ctx).pop(size),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() => _note!.fontSize = chosen);
+  }
+
   Future<void> _insertClipArt() async {
     final result = await Navigator.of(context).push<ClipArtResult>(
       MaterialPageRoute(builder: (_) => const ClipArtPickerScreen(), fullscreenDialog: true),
@@ -448,6 +481,53 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final pos = ctrl.selection.isValid ? ctrl.selection.baseOffset : ctrl.text.length;
     ctrl.text = ctrl.text.substring(0, pos) + text + ctrl.text.substring(pos);
     ctrl.selection = TextSelection.collapsed(offset: pos + text.length);
+  }
+
+  /// Ζητά αριθμό γραμμών/στηλών και εισάγει ένα markdown (GFM) πίνακα.
+  Future<void> _insertTable() async {
+    final rowsCtrl = TextEditingController(text: '3');
+    final colsCtrl = TextEditingController(text: '3');
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(context, el: 'Εισαγωγή πίνακα', en: 'Insert table')),
+        content: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: rowsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: tr(context, el: 'Γραμμές', en: 'Rows')),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: colsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: tr(context, el: 'Στήλες', en: 'Columns')),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr(context, el: 'Εισαγωγή', en: 'Insert'))),
+        ],
+      ),
+    );
+    if (result != true || !mounted) return;
+    final rows = int.tryParse(rowsCtrl.text.trim())?.clamp(1, 20).toInt() ?? 3;
+    final cols = int.tryParse(colsCtrl.text.trim())?.clamp(1, 10).toInt() ?? 3;
+
+    final buffer = StringBuffer('\n');
+    buffer.writeln('| ${List.generate(cols, (i) => 'Στήλη ${i + 1}').join(' | ')} |');
+    buffer.writeln('| ${List.generate(cols, (_) => '---').join(' | ')} |');
+    for (var r = 0; r < rows; r++) {
+      buffer.writeln('| ${List.generate(cols, (_) => '  ').join(' | ')} |');
+    }
+    buffer.write('\n');
+    _insertAtCursor(buffer.toString());
   }
 
   // ── IMPORT ─────────────────────────────────────────────────────────────────
@@ -808,6 +888,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   _tb(Icons.code, () => _toggleWrap('`', '`'), tip: tr(context, el: 'Inline κώδικας', en: 'Inline code'), active: _selectionWrapped('`', '`')),
                   _tb(Icons.data_object, () => _toggleWrap('\n```\n', '\n```\n'), tip: tr(context, el: 'Block κώδικα', en: 'Code block')),
                   _tb(Icons.format_quote, () => _togglePrefix('> '), tip: tr(context, el: 'Παράθεση', en: 'Quote')),
+                  _tb(Icons.table_chart_outlined, _insertTable, tip: tr(context, el: 'Πίνακας', en: 'Table')),
                   const SizedBox(width: 4),
                   Container(width: 1, height: 24, color: Theme.of(context).dividerColor),
                   const SizedBox(width: 4),
@@ -831,6 +912,22 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         const SizedBox(width: 6),
                         Text(_note!.font,
                             style: NoteFonts.style(_note!.font, const TextStyle(fontSize: 13))),
+                        const Icon(Icons.arrow_drop_down, size: 18),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Μέγεθος γραμματοσειράς
+                  InkWell(
+                    onTap: _pickFontSize,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.format_size, size: 20),
+                        const SizedBox(width: 6),
+                        Text('${_note!.fontSize.round()}',
+                            style: const TextStyle(fontSize: 13)),
                         const Icon(Icons.arrow_drop_down, size: 18),
                       ]),
                     ),
@@ -868,7 +965,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         textAlignVertical: TextAlignVertical.top,
         style: NoteFonts.style(
           _note!.font,
-          const TextStyle(fontSize: 15, height: 1.5),
+          TextStyle(fontSize: _note!.fontSize, height: 1.5),
         ),
         decoration: const InputDecoration(
           hintText: '# Γράψε σε markdown...',
@@ -1078,14 +1175,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       textTheme: NoteFonts.textTheme(_note!.font, Theme.of(context).textTheme),
                     ),
                   ).copyWith(
+                    // Το μέγεθος γραμματοσειράς της σημείωσης (_note!.fontSize)
+                    // είναι η βάση για την παράγραφο· οι επικεφαλίδες
+                    // κλιμακώνονται αναλογικά πάνω σε αυτήν.
                     p: NoteFonts.style(_note!.font,
-                        Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6)),
+                        TextStyle(fontSize: _note!.fontSize, height: 1.6)),
                     h1: NoteFonts.style(_note!.font,
-                        Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        TextStyle(fontSize: _note!.fontSize * 1.6, fontWeight: FontWeight.bold)),
                     h2: NoteFonts.style(_note!.font,
-                        Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        TextStyle(fontSize: _note!.fontSize * 1.3, fontWeight: FontWeight.bold)),
                     h3: NoteFonts.style(_note!.font,
-                        Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        TextStyle(fontSize: _note!.fontSize * 1.15, fontWeight: FontWeight.bold)),
                     code: TextStyle(fontFamily: 'monospace', backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest),
                     codeblockDecoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
