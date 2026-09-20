@@ -9,6 +9,7 @@ class NoteDocument {
   String title;
   List<String> tags;
   String font;
+  double fontSize;
   DateTime createdAt;
   DateTime updatedAt;
   String body;
@@ -23,6 +24,7 @@ class NoteDocument {
     required this.title,
     this.tags = const [],
     this.font = 'Roboto',
+    this.fontSize = 15.0,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.body = '',
@@ -38,6 +40,7 @@ class NoteDocument {
       'title': title,
       'tags': tags,
       'font': font,
+      'fontSize': fontSize,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'attachmentIds': attachmentIds,
@@ -61,6 +64,7 @@ class NoteDocument {
       title: yamlMap['title'] as String? ?? 'Χωρίς τίτλο',
       tags: (yamlMap['tags'] as YamlList?)?.map((e) => e.toString()).toList() ?? [],
       font: yamlMap['font'] as String? ?? 'Roboto',
+      fontSize: (yamlMap['fontSize'] as num?)?.toDouble() ?? 15.0,
       createdAt: DateTime.parse(yamlMap['createdAt'] as String),
       updatedAt: DateTime.parse(yamlMap['updatedAt'] as String),
       body: body,

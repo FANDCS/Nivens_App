@@ -141,6 +141,7 @@ class _RootRouter extends StatefulWidget {
 class _RootRouterState extends State<_RootRouter> {
   static const _intentChannel = MethodChannel('notes_app/intent');
   String? _intentFilePath;
+  bool _quickNote = false;
 
   @override
   void initState() {
@@ -154,13 +155,24 @@ class _RootRouterState extends State<_RootRouter> {
       final path = await _intentChannel.invokeMethod<String?>('getInitialFile');
       if (path != null && mounted) setState(() => _intentFilePath = path);
     } catch (_) {}
-    // Αρχείο που ανοίχτηκε ενώ η εφαρμογή έτρεχε ήδη
+    // "Γρήγορη σημείωση" από shortcut/quick-settings tile, αν έτσι ξεκίνησε η εφαρμογή
+    try {
+      final action = await _intentChannel.invokeMethod<String?>('getLaunchAction');
+      if (action == 'quick_note' && mounted) setState(() => _quickNote = true);
+    } catch (_) {}
+    // Αρχείο που ανοίχτηκε (ή "Γρήγορη σημείωση") ενώ η εφαρμογή έτρεχε ήδη
     _intentChannel.setMethodCallHandler((call) async {
       if (call.method == 'onFileOpened' && call.arguments is String && mounted) {
         setState(() {
           _intentFilePath = call.arguments as String;
+          _quickNote = false;
           _pdfChoiceMade = false;
           _pdfViewOnly = false;
+        });
+      } else if (call.method == 'onQuickNote' && mounted) {
+        setState(() {
+          _quickNote = true;
+          _intentFilePath = null;
         });
       }
       return null;
@@ -248,6 +260,13 @@ class _RootRouterState extends State<_RootRouter> {
           builder: (context, keySnapshot) {
             if (!keySnapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
             final db = AppDatabase(AppDatabase.openEncrypted(keySnapshot.data!));
+
+            if (_quickNote) {
+              return NoteEditorScreen(
+                database: db,
+                encryptionService: widget.encryptionService,
+              );
+            }
 
             if (_intentFilePath != null) {
               final isPdf = _intentFilePath!.toLowerCase().endsWith('.pdf');

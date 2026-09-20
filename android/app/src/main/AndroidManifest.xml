@@ -37,9 +37,20 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Στατικό shortcut "Γρήγορη σημείωση" (long-press στο εικονίδιο) -->
+            <meta-data
+              android:name="android.app.shortcuts"
+              android:resource="@xml/shortcuts"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Δέχεται το ACTION_QUICK_NOTE από το shortcut ή το quick-settings tile -->
+            <intent-filter>
+                <action android:name="com.example.notes_app.ACTION_QUICK_NOTE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
 
             <!-- ══ Άνοιγμα αρχείων από την εξερεύνηση αρχείων ══════════════
@@ -98,6 +109,17 @@
                 <data android:mimeType="text/plain"/>
             </intent-filter>
         </activity>
+        <!-- Πλακίδιο Γρήγορων Ρυθμίσεων "Γρήγορη σημείωση" -->
+        <service
+            android:name=".QuickNoteTileService"
+            android:label="@string/quick_note_short_label"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

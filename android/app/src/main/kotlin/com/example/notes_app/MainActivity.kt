@@ -19,13 +19,19 @@ import java.io.File
  */
 class MainActivity : FlutterActivity() {
 
+    companion object {
+        const val ACTION_QUICK_NOTE = "com.example.notes_app.ACTION_QUICK_NOTE"
+    }
+
     private val channelName = "notes_app/intent"
     private var pendingFilePath: String? = null
+    private var pendingQuickNote: Boolean = false
     private var channel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         pendingFilePath = resolveIntentFile(intent)
+        pendingQuickNote = intent?.action == ACTION_QUICK_NOTE
 
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
         channel?.setMethodCallHandler { call, result ->
@@ -34,15 +40,28 @@ class MainActivity : FlutterActivity() {
                     result.success(pendingFilePath)
                     pendingFilePath = null
                 }
+                "getLaunchAction" -> {
+                    result.success(if (pendingQuickNote) "quick_note" else null)
+                    pendingQuickNote = false
+                }
                 else -> result.notImplemented()
             }
         }
     }
 
-    /** Όταν η εφαρμογή τρέχει ήδη και ο χρήστης ανοίξει άλλο αρχείο. */
+    /** Όταν η εφαρμογή τρέχει ήδη και ο χρήστης ανοίξει άλλο αρχείο,
+     *  ή πατήσει το shortcut/tile "Γρήγορη σημείωση". */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.action == ACTION_QUICK_NOTE) {
+            if (channel != null) {
+                channel?.invokeMethod("onQuickNote", null)
+            } else {
+                pendingQuickNote = true
+            }
+            return
+        }
         val path = resolveIntentFile(intent)
         if (path != null) {
             if (channel != null) {
