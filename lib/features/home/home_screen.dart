@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => SettingsScreen(
         encryptionService: widget.encryptionService,
+        database: widget.database,
         themeMode: widget.themeMode,
         onThemeModeChanged: widget.onThemeModeChanged,
         onLocaleChanged: widget.onLocaleChanged,

@@ -21,8 +21,10 @@ sqlcipher conflict, κ.λπ.)
 - Καθημερινά: quick-add, edit, delete, tags/κατηγορίες, export (encrypted)
 - Encrypted export (.notesbackup): μία σημείωση / όλες τις σημειώσεις / όλα
   τα καθημερινά — password-protected (AES-256-GCM + Argon2id)
-- Supabase sync: service έτοιμο (core/sync/supabase_sync_service.dart),
-  δεν είναι ακόμα καλωδιωμένο σε UI trigger
+- Συγχρονισμός: pluggable multi-backend σύστημα (Supabase / PocketBase /
+  Custom REST) με end-to-end κρυπτογράφηση AES-256-GCM ανά εγγραφή,
+  καλωδιωμένο στις Ρυθμίσεις (ενότητα "Συγχρονισμός") — δες core/sync/
+  και sync-backend/*.md. Συγχρονίζει σημειώσεις και καθημερινά
 
 ## Νέα (αυτή η έκδοση)
 

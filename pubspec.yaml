@@ -31,6 +31,12 @@ dependencies:
   cryptography: ^2.7.0
   flutter_secure_storage: ^9.2.2
 
+  # --- Sync (raw REST προς Supabase/PocketBase/custom server, δες lib/core/sync/) ---
+  http: ^1.2.2
+
+  # --- About screen (άνοιγμα email/links) ---
+  url_launcher: ^6.2.5
+
   # --- Πολυμέσα / ζωγραφική ---
   image_picker: ^1.1.2
   file_picker: ^8.1.2
