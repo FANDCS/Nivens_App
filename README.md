@@ -1,55 +1,52 @@
-# Notes App
+<p align="right">
+</p>
 
-## Τρέξιμο (μετά από flutter create --platforms=android,linux,windows notes_app)
+<div align="center">
+  <a href="https://github.com/FANDCS/Nivens_App">
+    <img src="/assets/icons/phonelefter_trans.png" height="100" alt="Callen Logo">
+  </a>
+  <h1>Callen</h1>
+  This app is provided, updated, and owned by the <b>FANDCS</b> organization.
+</div>
 
-```bash
-flutter pub get
-dart run build_runner build --delete-conflicting-outputs
-flutter run --release -d <device>
-```
+## Description
+This is a simple open source application with fresh and simple ui for making notes, preview pdf, create instants daily notes with sync between android and linux (maybe and Windows in future). We don't collect any personal or static data. 
+<br>**Beta Release**
 
-## Android-specific setup
+### Screenshots
+<img alt="dialer" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" height="400">
 
-Δες ANDROID_SETUP.md για AGP/Kotlin/Gradle versions, permissions, και το
-ιστορικό των προβλημάτων/λύσεων που αντιμετωπίσαμε (jni/record, sqlite3 vs
-sqlcipher conflict, κ.λπ.)
+## Supported Platforms
+* **Android:** 7+
+* **Windows:** 10, 11
+* **Linux:** All distributions (as AppImage)
 
-## Τρέχουσα κατάσταση λειτουργιών
+## Stores - Coming Soon
+### Android (universal support)
+<p align="left">
+  
+  <a href="https://apkpure.com/p/gr.fandcs.callen" target="_blank">
+    <img alt="APKPure" src="https://img.shields.io/badge/Get%20it%20on-APKPure-00ca73?style=for-the-badge&logo=android&logoColor=white">
+  </a>
+<!--  
+  <a href="https://gr.fandcs.callen.en.uptodown.com/android" target="_blank">
+    <img alt="Uptodown" src="https://img.shields.io/badge/Get%20it%20on-Uptodown-002B49?style=for-the-badge&logo=android&logoColor=white">
+  </a>
+  <!-- F-Droid 
+  <a href="https://f-droid.org/packages/gr.fandcs.callen/" target="_blank">
+    <img alt="F-Droid" src="https://img.shields.io/badge/Get%20it%20on-F--Droid-1976D2?style=for-the-badge&logo=f-droid&logoColor=white">
+  </a> -->
 
-- Onboarding: προαιρετικός master κωδικός (ή αυτόματο κλειδί συσκευής)
-- Σημειώσεις: markdown editor, tags/κατηγορίες, delete, export (encrypted)
-- Καθημερινά: quick-add, edit, delete, tags/κατηγορίες, export (encrypted)
-- Encrypted export (.notesbackup): μία σημείωση / όλες τις σημειώσεις / όλα
-  τα καθημερινά — password-protected (AES-256-GCM + Argon2id)
-- Συγχρονισμός: pluggable multi-backend σύστημα (Supabase / PocketBase /
-  Custom REST) με end-to-end κρυπτογράφηση AES-256-GCM ανά εγγραφή,
-  καλωδιωμένο στις Ρυθμίσεις (ενότητα "Συγχρονισμός") — δες core/sync/
-  και sync-backend/*.md. Συγχρονίζει σημειώσεις και καθημερινά
+### Linux (under development)
+- Flathub
 
-## Νέα (αυτή η έκδοση)
+## Project Contributors
+- 🖥️ [Lefteris Trompakas](https://www.github.com/AndroidCreator5)
+- 🖌️ [Alex_632gr](https://www.instagram.com/alex632gr_/)
+- 🦾 Claude Sonnet 5 (*Anthropic give us a larger free plan*)
 
-- **Ζουμ στην Προβολή**: pinch, κουμπιά +/− με ένδειξη ποσοστού, διπλό
-  πάτημα για 100% ↔ 250%, εύρος 50%–800%, σύρσιμο (pan) όταν είσαι
-  ζουμαρισμένος.
-- **Ζωγραφική σε πάνω layer**: η «Ζωγραφική πάνω σε όλα» αποθηκεύεται πλέον
-  ως ξεχωριστό PNG με διάφανο φόντο (`overlay` στο front-matter) και
-  αποδίδεται ΠΑΝΩ από κείμενο και πολυμέσα, χωρίς να αλλοιώνει το markdown.
-  Μπορείς να το κρύψεις/εμφανίσεις ή να το διαγράψεις.
-- **Γραμματοσειρές ανά σημείωση**: ~28 γραμματοσειρές (Google Fonts, με
-  υποστήριξη ελληνικών) με picker και ζωντανή προεπισκόπηση — εφαρμόζονται
-  και στον editor και στην Προβολή.
-- **Άνοιγμα Word (.docx)**: εξαγωγή σε markdown (επικεφαλίδες, έντονα/
-  πλάγια, λίστες, πίνακες) + εξαγωγή των ενσωματωμένων εικόνων.
-- **Άνοιγμα από την εξερεύνηση αρχείων**: η εφαρμογή εμφανίζεται στο
-  «Άνοιγμα με...» για PDF, .docx, .md, .txt (intent-filters + MainActivity).
-- **Upload στο termbin.com**: Εξαγωγή → «Ανέβασμα στο termbin.com» (TCP
-  9999) και επιστροφή δημόσιου link. Προσοχή: χωρίς κρυπτογράφηση.
+## Privacy Policy & Terms of Use
+[Privacy Policy & Terms of Use on GitHub](https://raw.githubusercontent.com/FANDCS/main/refs/heads/main/Privacy_Policy_and_Terms_of_Use.md)
 
-## Επόμενα βήματα
-
-- [ ] Import/restore από .notesbackup αρχείο
-- [ ] Καλωδίωση SupabaseSyncService σε background trigger
-- [ ] Πλούσιο rich-text editor (πάνω από markdown) — attachments
-- [x] Γραμματοσειρές ανά σημείωση
-- [x] Ζωγραφική ως πάνω layer + ζουμ στην Προβολή
-- [ ] Υποστήριξη παλιού binary .doc (Word 97-2003)
+#### Current Version
+`0.1.0 Beta Release`
