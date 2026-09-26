@@ -3,9 +3,9 @@
 
 <div align="center">
   <a href="https://github.com/FANDCS/Nivens_App">
-    <img src="/assets/icons/phonelefter_trans.png" height="100" alt="Callen Logo">
+    <img src="/assets/icons/phonelefter_trans.png" height="100" alt="Nivnes Logo">
   </a>
-  <h1>Callen</h1>
+  <h1>Nivens</h1>
   This app is provided, updated, and owned by the <b>FANDCS</b> organization.
 </div>
 
@@ -24,11 +24,11 @@ This is a simple open source application with fresh and simple ui for making not
 ## Stores - Coming Soon
 ### Android (universal support)
 <p align="left">
-  
+ <!--  
   <a href="https://apkpure.com/p/gr.fandcs.callen" target="_blank">
     <img alt="APKPure" src="https://img.shields.io/badge/Get%20it%20on-APKPure-00ca73?style=for-the-badge&logo=android&logoColor=white">
   </a>
-<!--  
+ 
   <a href="https://gr.fandcs.callen.en.uptodown.com/android" target="_blank">
     <img alt="Uptodown" src="https://img.shields.io/badge/Get%20it%20on-Uptodown-002B49?style=for-the-badge&logo=android&logoColor=white">
   </a>
