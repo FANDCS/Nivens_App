@@ -13,8 +13,10 @@
 This is a simple open source application with fresh and simple ui for making notes, preview pdf, create instants daily notes with sync between android and linux (maybe and Windows in future). We don't collect any personal or static data. 
 <br>**Beta Release**
 
-### Screenshots
-<img alt="dialer" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" height="400">
+### Screenshots 
+<!-- 
+<img alt="dialer" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" height="400">  <img alt="fake_call" src="/fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" height="400"> 
+-->
 
 ## Supported Platforms
 * **Android:** 7+
