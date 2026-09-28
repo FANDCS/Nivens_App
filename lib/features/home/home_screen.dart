@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ..where((n) => n.isDeleted.equals(false)))
         .get();
     if (notes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Δεν υπάρχουν σημειώσεις.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, el: 'Δεν υπάρχουν σημειώσεις.', en: 'There are no notes.'))));
       return;
     }
     final choice = await showExportFormatMenu(context: context, allowQr: false);
@@ -129,9 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
         for (final e in files.entries) {
           paths.add(await svc.exportPlainFile(content: e.value, filename: e.key));
         }
-        path = paths.first.replaceAll(RegExp(r'[^/]+$'), '(${paths.length} αρχεία)');
+        path = paths.first.replaceAll(RegExp(r'[^/]+$'), '(${paths.length} ${tr(context, el: 'αρχεία', en: 'files')})');
       }
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Εξήχθη: $path')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
     } finally {
       if (mounted) setState(() => _isExportingAll = false);
     }
@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _exportAllDaily() async {
     final entries = await widget.database.select(widget.database.dailyEntries).get();
     if (entries.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Δεν υπάρχουν καταχωρήσεις.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, el: 'Δεν υπάρχουν καταχωρήσεις.', en: 'There are no entries.'))));
       return;
     }
     final choice = await showExportFormatMenu(context: context, allowQr: false);
@@ -184,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         path = await ExportService().exportPlainFile(content: content, filename: filename);
       }
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Εξήχθη: $path')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
     } finally {
       if (mounted) setState(() => _isExportingAll = false);
     }
@@ -199,17 +199,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabIndex == 0 ? 'Σημειώσεις' : 'Καθημερινά'),
+        title: Text(_tabIndex == 0
+            ? tr(context, el: 'Σημειώσεις', en: 'Notes')
+            : tr(context, el: 'Καθημερινά', en: 'Daily log')),
         actions: [
           if (_tabIndex == 0)
-            IconButton(icon: const Icon(Icons.upload_file_outlined), tooltip: 'Εισαγωγή', onPressed: _openImport),
+            IconButton(icon: const Icon(Icons.upload_file_outlined), tooltip: tr(context, el: 'Εισαγωγή', en: 'Import'), onPressed: _openImport),
           if (_tabIndex == 1)
-            IconButton(icon: const Icon(Icons.bar_chart_outlined), tooltip: 'Στατιστικά', onPressed: _openStats),
+            IconButton(icon: const Icon(Icons.bar_chart_outlined), tooltip: tr(context, el: 'Στατιστικά', en: 'Statistics'), onPressed: _openStats),
           IconButton(
             icon: _isExportingAll
                 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.ios_share_outlined),
-            tooltip: _tabIndex == 0 ? 'Εξαγωγή σημειώσεων' : 'Εξαγωγή καθημερινών',
+            tooltip: _tabIndex == 0
+                ? tr(context, el: 'Εξαγωγή σημειώσεων', en: 'Export notes')
+                : tr(context, el: 'Εξαγωγή καθημερινών', en: 'Export daily log'),
             onPressed: _isExportingAll ? null : (_tabIndex == 0 ? _exportAllNotes : _exportAllDaily),
           ),
           PopupMenuButton<String>(
@@ -243,9 +247,9 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: 'Σημειώσεις'),
-          NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Καθημερινά'),
+        destinations: [
+          NavigationDestination(icon: const Icon(Icons.note_outlined), selectedIcon: const Icon(Icons.note), label: tr(context, el: 'Σημειώσεις', en: 'Notes')),
+          NavigationDestination(icon: const Icon(Icons.calendar_today_outlined), selectedIcon: const Icon(Icons.calendar_today), label: tr(context, el: 'Καθημερινά', en: 'Daily log')),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -274,12 +278,12 @@ class _NotesTab extends StatelessWidget {
       builder: (context, snapshot) {
         final notes = snapshot.data ?? [];
         if (notes.isEmpty) {
-          return const Center(child: Text('Δεν υπάρχουν ακόμα σημειώσεις.\nΠάτα + για να φτιάξεις μία.', textAlign: TextAlign.center));
+          return Center(child: Text(tr(context, el: 'Δεν υπάρχουν ακόμα σημειώσεις.\nΠάτα + για να φτιάξεις μία.', en: 'No notes yet.\nTap + to create one.'), textAlign: TextAlign.center));
         }
         return ListView.builder(
           itemCount: notes.length,
           itemBuilder: (context, i) => ListTile(
-            title: Text(notes[i].title.isEmpty ? '(χωρίς τίτλο)' : notes[i].title),
+            title: Text(notes[i].title.isEmpty ? tr(context, el: '(χωρίς τίτλο)', en: '(untitled)') : notes[i].title),
             subtitle: Text(notes[i].updatedAt.toLocal().toString().substring(0, 16)),
             onTap: () => onTapNote(notes[i].id),
           ),
@@ -301,7 +305,7 @@ class _DailyLogTab extends StatelessWidget {
       builder: (context, snapshot) {
         final entries = snapshot.data ?? [];
         if (entries.isEmpty) {
-          return const Center(child: Text('Δεν υπάρχουν ακόμα καταχωρήσεις.\nΠάτα + για να προσθέσεις μία.', textAlign: TextAlign.center));
+          return Center(child: Text(tr(context, el: 'Δεν υπάρχουν ακόμα καταχωρήσεις.\nΠάτα + για να προσθέσεις μία.', en: 'No entries yet.\nTap + to add one.'), textAlign: TextAlign.center));
         }
         final sorted = [...entries]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
         return ListView.builder(

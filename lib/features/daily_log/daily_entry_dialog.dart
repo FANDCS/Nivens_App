@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 import '../categories/category_picker.dart';
 
@@ -23,7 +24,9 @@ Future<void> showAddDailyEntryDialog({
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
-        title: Text(existing == null ? 'Νέα καταχώρηση' : 'Επεξεργασία'),
+        title: Text(existing == null
+            ? tr(context, el: 'Νέα καταχώρηση', en: 'New entry')
+            : tr(context, el: 'Επεξεργασία', en: 'Edit')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -33,9 +36,9 @@ Future<void> showAddDailyEntryDialog({
                 controller: textController,
                 autofocus: true,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Τι σε απασχόλησε σήμερα;',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: tr(context, el: 'Τι σε απασχόλησε σήμερα;', en: 'What was on your mind today?'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -50,7 +53,7 @@ Future<void> showAddDailyEntryDialog({
                     ),
                   ActionChip(
                     avatar: const Icon(Icons.add, size: 18),
-                    label: const Text('Κατηγορία'),
+                    label: Text(tr(context, el: 'Κατηγορία', en: 'Category')),
                     onPressed: () async {
                       final tag = await pickOrCreateCategory(
                         context: context,
@@ -65,7 +68,7 @@ Future<void> showAddDailyEntryDialog({
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Text('Βαρύτητα: '),
+                  Text(tr(context, el: 'Βαρύτητα: ', en: 'Weight: ')),
                   Expanded(
                     child: Slider(
                       value: weight.toDouble(),
@@ -84,13 +87,15 @@ Future<void> showAddDailyEntryDialog({
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Άκυρο'),
+            child: Text(tr(context, el: 'Άκυρο', en: 'Cancel')),
           ),
           FilledButton(
             onPressed: textController.text.trim().isEmpty
                 ? null
                 : () => Navigator.of(context).pop(true),
-            child: Text(existing == null ? 'Προσθήκη' : 'Αποθήκευση'),
+            child: Text(existing == null
+                ? tr(context, el: 'Προσθήκη', en: 'Add')
+                : tr(context, el: 'Αποθήκευση', en: 'Save')),
           ),
         ],
       ),

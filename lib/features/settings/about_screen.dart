@@ -44,20 +44,17 @@ class AboutScreen extends StatelessWidget {
               width: 84,
               height: 84,
               clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(24),
-              ),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(24)),
               // Βάλε το πραγματικό εικονίδιο της εφαρμογής (π.χ. export από
               // τον launcher icon σου) σε assets/icons/nivens_icon.png — θα
               // εμφανιστεί αυτόματα εδώ. Μέχρι τότε δείχνει ένα placeholder.
               child: Image.asset(
                 'assets/icons/nivens_icon.png',
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Icon(
                   Icons.note_outlined,
                   size: 44,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),

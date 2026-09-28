@@ -29,18 +29,12 @@ class OrgInfoScreen extends StatelessWidget {
               Container(
                 width: 56,
                 height: 56,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
                 clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: brand.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(
-                    'assets/icons/fandcs_icon.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(Icons.groups_outlined, color: brand),
-                  ),
+                child: Image.asset(
+                  'assets/icons/fandcs_icon.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(Icons.groups_outlined, size: 28, color: brand),
                 ),
               ),
               const SizedBox(width: 16),

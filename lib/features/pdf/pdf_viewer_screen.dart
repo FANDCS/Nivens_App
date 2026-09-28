@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../core/i18n.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 /// Προβολή ενός PDF αρχείου μέσα στην εφαρμογή — πέρα από την εξαγωγή
@@ -43,9 +44,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 controller: _searchController,
                 autofocus: true,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Αναζήτηση στο PDF...',
-                  hintStyle: TextStyle(color: Colors.white70),
+                decoration: InputDecoration(
+                  hintText: tr(context, el: 'Αναζήτηση στο PDF...', en: 'Search in PDF...'),
+                  hintStyle: const TextStyle(color: Colors.white70),
                   border: InputBorder.none,
                 ),
                 onSubmitted: _doSearch,
@@ -68,12 +69,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.zoom_in),
-            tooltip: 'Μεγέθυνση',
+            tooltip: tr(context, el: 'Μεγέθυνση', en: 'Zoom in'),
             onPressed: () => _controller.zoomLevel = (_controller.zoomLevel + 0.25).clamp(1.0, 4.0),
           ),
           IconButton(
             icon: const Icon(Icons.zoom_out),
-            tooltip: 'Σμίκρυνση',
+            tooltip: tr(context, el: 'Σμίκρυνση', en: 'Zoom out'),
             onPressed: () => _controller.zoomLevel = (_controller.zoomLevel - 0.25).clamp(1.0, 4.0),
           ),
         ],

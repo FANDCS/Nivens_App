@@ -141,5 +141,19 @@
         <intent>
             <action android:name="android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"/>
         </intent>
+        <!-- url_launcher (Σχετικά): χωρίς αυτά το canLaunchUrl επιστρέφει
+             false σε Android 11+ και τα links (https/mailto) δεν ανοίγουν. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="mailto"/>
+        </intent>
     </queries>
 </manifest>

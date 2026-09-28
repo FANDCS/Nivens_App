@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 import '../notes/models/note.dart';
 import '../pdf/pdf_viewer_screen.dart';
@@ -41,7 +42,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
     setState(() {
       _isImporting = true;
-      _statusMessage = 'Επεξεργασία...';
+      _statusMessage = tr(context, el: 'Επεξεργασία...', en: 'Processing...');
     });
 
     try {
@@ -66,7 +67,7 @@ class _ImportScreenState extends State<ImportScreen> {
         await _importPlainText(path, ext);
       }
     } catch (e) {
-      setState(() => _statusMessage = 'Σφάλμα: $e');
+      setState(() => _statusMessage = '${tr(context, el: 'Σφάλμα', en: 'Error')}: $e');
     } finally {
       if (mounted) setState(() => _isImporting = false);
     }
@@ -77,18 +78,18 @@ class _ImportScreenState extends State<ImportScreen> {
     final pw = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Κωδικός backup'),
+        title: Text(tr(context, el: 'Κωδικός backup', en: 'Backup password')),
         content: TextField(
           controller: passwordController,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Κωδικός'),
+          decoration: InputDecoration(labelText: tr(context, el: 'Κωδικός', en: 'Password')),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Άκυρο')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
           FilledButton(
               onPressed: () => Navigator.of(ctx).pop(passwordController.text),
-              child: const Text('ΟΚ')),
+              child: Text('OK')),
         ],
       ),
     );
@@ -107,31 +108,31 @@ class _ImportScreenState extends State<ImportScreen> {
       }
       count++;
     }
-    setState(() => _statusMessage = 'Εισήχθησαν $count σημείωση/σεις.');
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθησαν $count σημείωση/σεις.', en: 'Imported $count note(s).'));
   }
 
   Future<void> _importJson(String path) async {
     final raw = await File(path).readAsString();
     await _saveNoteFromJson(raw);
-    setState(() => _statusMessage = 'Εισήχθη 1 σημείωση (JSON).');
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθη 1 σημείωση (JSON).', en: 'Imported 1 note (JSON).'));
   }
 
   Future<bool?> _askPdfViewOnly() {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Αρχείο PDF'),
+        title: Text(tr(context, el: 'Αρχείο PDF', en: 'PDF file')),
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Row(children: [
-              Icon(Icons.picture_as_pdf_outlined), SizedBox(width: 12), Text('Προβολή ως PDF'),
+            child: Row(children: [
+              const Icon(Icons.picture_as_pdf_outlined), const SizedBox(width: 12), Text(tr(context, el: 'Προβολή ως PDF', en: 'View as PDF')),
             ]),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Row(children: [
-              Icon(Icons.text_snippet_outlined), SizedBox(width: 12), Text('Εξαγωγή κειμένου σε νέα σημείωση'),
+            child: Row(children: [
+              const Icon(Icons.text_snippet_outlined), const SizedBox(width: 12), Text(tr(context, el: 'Εξαγωγή κειμένου σε νέα σημείωση', en: 'Extract text into a new note')),
             ]),
           ),
         ],
@@ -150,14 +151,14 @@ class _ImportScreenState extends State<ImportScreen> {
     doc.dispose();
     final basename = File(path).uri.pathSegments.last.replaceAll('.pdf', '');
     await _saveNoteFromMarkdown(buffer.toString(), title: basename);
-    setState(() => _statusMessage = 'Εισήχθη PDF ως σημείωση.');
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθη PDF ως σημείωση.', en: 'Imported PDF as a note.'));
   }
 
   Future<void> _importPlainText(String path, String ext) async {
     final content = await File(path).readAsString();
     final basename = File(path).uri.pathSegments.last.replaceAll('.$ext', '');
     await _saveNoteFromMarkdown(content, title: basename);
-    setState(() => _statusMessage = 'Εισήχθη 1 σημείωση.');
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθη 1 σημείωση.', en: 'Imported 1 note.'));
   }
 
   Future<void> _saveNoteFromMarkdown(String content, {String? title}) async {
@@ -165,7 +166,7 @@ class _ImportScreenState extends State<ImportScreen> {
     try {
       note = NoteDocument.fromMarkdownFile(content);
     } catch (_) {
-      note = NoteDocument(title: title ?? 'Εισαγωγή', body: content);
+      note = NoteDocument(title: title ?? tr(context, el: 'Εισαγωγή', en: 'Import'), body: content);
     }
     note.id = const Uuid().v4(); // νέο id για να μην συγκρουστεί
     final encrypted = await widget.encryptionService.encryptText(note.toMarkdownFile());
@@ -193,7 +194,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
   Future<void> _saveNoteFromJsonMap(Map<String, dynamic> m) async {
     final note = NoteDocument(
-      title: m['title'] as String? ?? 'Εισαγωγή',
+      title: m['title'] as String? ?? tr(context, el: 'Εισαγωγή', en: 'Import'),
       body: m['body'] as String? ?? '',
       tags: (m['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
@@ -212,7 +213,7 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Εισαγωγή')),
+      appBar: AppBar(title: Text(tr(context, el: 'Εισαγωγή', en: 'Import'))),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -221,14 +222,20 @@ class _ImportScreenState extends State<ImportScreen> {
             children: [
               const Icon(Icons.upload_file_outlined, size: 72),
               const SizedBox(height: 16),
-              Text('Εισαγωγή σημειώσεων', style: Theme.of(context).textTheme.titleMedium),
+              Text(tr(context, el: 'Εισαγωγή σημειώσεων', en: 'Import notes'), style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              const Text(
-                'Υποστηριζόμενες μορφές:\n'
-                '.md / .txt — Markdown ή απλό κείμενο\n'
-                '.json — Εξαγωγή σε JSON\n'
-                '.pdf — Προβολή ως PDF ή εξαγωγή κειμένου\n'
-                '.notesbackup — Κρυπτογραφημένο backup (με κωδικό)',
+              Text(
+                tr(context,
+                    el: 'Υποστηριζόμενες μορφές:\n'
+                        '.md / .txt — Markdown ή απλό κείμενο\n'
+                        '.json — Εξαγωγή σε JSON\n'
+                        '.pdf — Προβολή ως PDF ή εξαγωγή κειμένου\n'
+                        '.notesbackup — Κρυπτογραφημένο backup (με κωδικό)',
+                    en: 'Supported formats:\n'
+                        '.md / .txt — Markdown or plain text\n'
+                        '.json — JSON export\n'
+                        '.pdf — View as PDF or extract text\n'
+                        '.notesbackup — Encrypted backup (password)'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -238,7 +245,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 FilledButton.icon(
                   onPressed: _pickAndImport,
                   icon: const Icon(Icons.folder_open_outlined),
-                  label: const Text('Επιλογή αρχείου'),
+                  label: Text(tr(context, el: 'Επιλογή αρχείου', en: 'Choose file')),
                 ),
               if (_statusMessage != null) ...[
                 const SizedBox(height: 16),

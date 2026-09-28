@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/i18n.dart';
 
 Future<String?> showExportPasswordDialog({
   required BuildContext context,
@@ -12,30 +13,36 @@ Future<String?> showExportPasswordDialog({
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Κωδικός για την εξαγωγή'),
+        title: Text(tr(context, el: 'Κωδικός για την εξαγωγή', en: 'Export password')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               hasAppPassphrase
-                  ? 'Χρησιμοποίησε τον κωδικό της εφαρμογής σου (ή έναν διαφορετικό) — '
-                    'θα χρειαστεί για να ανοίξεις ξανά αυτό το αρχείο.'
-                  : 'Δώσε έναν κωδικό για να προστατέψεις το αρχείο εξαγωγής — '
-                    'θα χρειαστεί για να το ανοίξεις ξανά.',
+                  ? tr(context,
+                      el: 'Χρησιμοποίησε τον κωδικό της εφαρμογής σου (ή έναν διαφορετικό) — '
+                          'θα χρειαστεί για να ανοίξεις ξανά αυτό το αρχείο.',
+                      en: 'Use your app passphrase (or a different one) — '
+                          "you'll need it to open this file again.")
+                  : tr(context,
+                      el: 'Δώσε έναν κωδικό για να προστατέψεις το αρχείο εξαγωγής — '
+                          'θα χρειαστεί για να το ανοίξεις ξανά.',
+                      en: 'Enter a password to protect the export file — '
+                          "you'll need it to open it again."),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Κωδικός'),
+              decoration: InputDecoration(labelText: tr(context, el: 'Κωδικός', en: 'Password')),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: confirmController,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Επιβεβαίωση'),
+              decoration: InputDecoration(labelText: tr(context, el: 'Επιβεβαίωση', en: 'Confirm')),
             ),
             if (error != null) ...[
               const SizedBox(height: 8),
@@ -46,21 +53,21 @@ Future<String?> showExportPasswordDialog({
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Άκυρο'),
+            child: Text(tr(context, el: 'Άκυρο', en: 'Cancel')),
           ),
           FilledButton(
             onPressed: () {
               if (controller.text.length < 6) {
-                setDialogState(() => error = 'Χρειάζεται τουλάχιστον 6 χαρακτήρες.');
+                setDialogState(() => error = tr(context, el: 'Χρειάζεται τουλάχιστον 6 χαρακτήρες.', en: 'At least 6 characters are required.'));
                 return;
               }
               if (controller.text != confirmController.text) {
-                setDialogState(() => error = 'Οι κωδικοί δεν ταιριάζουν.');
+                setDialogState(() => error = tr(context, el: 'Οι κωδικοί δεν ταιριάζουν.', en: "Passwords don't match."));
                 return;
               }
               Navigator.of(context).pop(controller.text);
             },
-            child: const Text('Συνέχεια'),
+            child: Text(tr(context, el: 'Συνέχεια', en: 'Continue')),
           ),
         ],
       ),

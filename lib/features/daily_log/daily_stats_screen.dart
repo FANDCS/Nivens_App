@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 
 class _CategoryStat {
@@ -48,13 +49,13 @@ class _DailyStatsScreenState extends State<DailyStatsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Στατιστικά'),
+        title: Text(tr(context, el: 'Στατιστικά', en: 'Statistics')),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Σύνολο'),
-            Tab(text: 'Ανά μήνα'),
-            Tab(text: 'Ανά χρόνο'),
+          tabs: [
+            Tab(text: tr(context, el: 'Σύνολο', en: 'Overall')),
+            Tab(text: tr(context, el: 'Ανά μήνα', en: 'By month')),
+            Tab(text: tr(context, el: 'Ανά χρόνο', en: 'By year')),
           ],
         ),
       ),
@@ -63,7 +64,7 @@ class _DailyStatsScreenState extends State<DailyStatsScreen>
         builder: (context, snapshot) {
           final entries = snapshot.data ?? [];
           if (entries.isEmpty) {
-            return const Center(child: Text('Δεν υπάρχουν ακόμα καταχωρήσεις.'));
+            return Center(child: Text(tr(context, el: 'Δεν υπάρχουν ακόμα καταχωρήσεις.', en: 'No entries yet.')));
           }
           return TabBarView(
             controller: _tabController,
@@ -95,7 +96,7 @@ class _OverallTab extends StatelessWidget {
     DailyEntry? latestEntry;
 
     for (final e in entries) {
-      final key = e.tag ?? 'Χωρίς κατηγορία';
+      final key = e.tag ?? tr(context, el: 'Χωρίς κατηγορία', en: 'No category');
       final stat = byCategory.putIfAbsent(key, () => _CategoryStat(key));
       stat.count++;
       stat.weightSum += e.weight;
@@ -112,7 +113,7 @@ class _OverallTab extends StatelessWidget {
     final stats = byCategory.values.toList()..sort((a, b) => b.count.compareTo(a.count));
     final avgWeight = entries.isEmpty ? 0.0 : totalWeight / entries.length;
     final busyDow = byDayOfWeek.indexOf(byDayOfWeek.reduce((a, b) => a > b ? a : b));
-    const dowLabels = ['Δευ', 'Τρι', 'Τετ', 'Πεμ', 'Παρ', 'Σαβ', 'Κυρ'];
+    final dowLabels = tr(context, el: 'Δευ,Τρι,Τετ,Πεμ,Παρ,Σαβ,Κυρ', en: 'Mon,Tue,Wed,Thu,Fri,Sat,Sun').split(',');
     final maxDow = byDayOfWeek.reduce((a, b) => a > b ? a : b);
 
     return ListView(
@@ -120,26 +121,26 @@ class _OverallTab extends StatelessWidget {
       children: [
         // Stat cards
         Row(children: [
-          Expanded(child: _statCard(context, 'Σύνολο', entries.length.toString())),
+          Expanded(child: _statCard(context, tr(context, el: 'Σύνολο', en: 'Total'), entries.length.toString())),
           const SizedBox(width: 12),
-          Expanded(child: _statCard(context, 'Ημέρες', uniqueDays.length.toString())),
+          Expanded(child: _statCard(context, tr(context, el: 'Ημέρες', en: 'Days'), uniqueDays.length.toString())),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _statCard(context, 'Μέση βαρύτητα', avgWeight.toStringAsFixed(1))),
+          Expanded(child: _statCard(context, tr(context, el: 'Μέση βαρύτητα', en: 'Avg. weight'), avgWeight.toStringAsFixed(1))),
           const SizedBox(width: 12),
-          Expanded(child: _statCard(context, 'Πυκνότητα', '${(entries.length / (uniqueDays.isEmpty ? 1 : uniqueDays.length)).toStringAsFixed(1)}/ημ')),
+          Expanded(child: _statCard(context, tr(context, el: 'Πυκνότητα', en: 'Density'), '${(entries.length / (uniqueDays.isEmpty ? 1 : uniqueDays.length)).toStringAsFixed(1)}${tr(context, el: '/ημ', en: '/day')}')),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _statCard(context, 'Ελάχ. βαρύτητα', minWeight.toString())),
+          Expanded(child: _statCard(context, tr(context, el: 'Ελάχ. βαρύτητα', en: 'Min. weight'), minWeight.toString())),
           const SizedBox(width: 12),
-          Expanded(child: _statCard(context, 'Μέγ. βαρύτητα', maxWeight.toString())),
+          Expanded(child: _statCard(context, tr(context, el: 'Μέγ. βαρύτητα', en: 'Max. weight'), maxWeight.toString())),
         ]),
         const SizedBox(height: 24),
 
         // Ημέρα εβδομάδας bar chart
-        Text('Καταχωρήσεις ανά ημέρα εβδομάδας', style: Theme.of(context).textTheme.titleSmall),
+        Text(tr(context, el: 'Καταχωρήσεις ανά ημέρα εβδομάδας', en: 'Entries by day of week'), style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         SizedBox(
           height: 160,
@@ -169,7 +170,7 @@ class _OverallTab extends StatelessWidget {
         const SizedBox(height: 24),
 
         // Ανά κατηγορία
-        Text('Ανά κατηγορία', style: Theme.of(context).textTheme.titleSmall),
+        Text(tr(context, el: 'Ανά κατηγορία', en: 'By category'), style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         if (stats.isNotEmpty) SizedBox(
           height: 200,
@@ -206,7 +207,7 @@ class _OverallTab extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.label_outline),
             title: Text(s.name),
-            subtitle: Text('Μέση βαρύτητα ${s.avgWeight.toStringAsFixed(1)}'),
+            subtitle: Text('${tr(context, el: 'Μέση βαρύτητα', en: 'Avg. weight')} ${s.avgWeight.toStringAsFixed(1)}'),
             trailing: Text('${s.count} (${((s.count / entries.length) * 100).toStringAsFixed(0)}%)'),
           ),
       ],
@@ -236,7 +237,7 @@ class _MonthlyTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Καταχωρήσεις ανά μήνα', style: Theme.of(context).textTheme.titleSmall),
+        Text(tr(context, el: 'Καταχωρήσεις ανά μήνα', en: 'Entries by month'), style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 12),
         SizedBox(
           height: 220,
@@ -274,8 +275,8 @@ class _MonthlyTab extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.calendar_month_outlined),
             title: Text(m.label),
-            subtitle: Text('Μέση βαρύτητα ${m.avgWeight.toStringAsFixed(1)}'),
-            trailing: Text('${m.count} καταχ.'),
+            subtitle: Text('${tr(context, el: 'Μέση βαρύτητα', en: 'Avg. weight')} ${m.avgWeight.toStringAsFixed(1)}'),
+            trailing: Text('${m.count} ${tr(context, el: 'καταχ.', en: 'entries')}'),
           ),
       ],
     );
@@ -303,7 +304,7 @@ class _YearlyTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Καταχωρήσεις ανά χρόνο', style: Theme.of(context).textTheme.titleSmall),
+        Text(tr(context, el: 'Καταχωρήσεις ανά χρόνο', en: 'Entries by year'), style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 12),
         SizedBox(
           height: 220,
@@ -337,8 +338,8 @@ class _YearlyTab extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.calendar_today_outlined),
             title: Text(y.label),
-            subtitle: Text('Μέση βαρύτητα ${y.avgWeight.toStringAsFixed(1)}'),
-            trailing: Text('${y.count} καταχ.'),
+            subtitle: Text('${tr(context, el: 'Μέση βαρύτητα', en: 'Avg. weight')} ${y.avgWeight.toStringAsFixed(1)}'),
+            trailing: Text('${y.count} ${tr(context, el: 'καταχ.', en: 'entries')}'),
           ),
           // Στήλη βαρύτητας ανά μήνα για το χρόνο αυτό
           Padding(
@@ -357,7 +358,7 @@ class _YearlyTab extends StatelessWidget {
         byMonth[e.timestamp.month - 1]++;
       }
     }
-    const monthLabels = ['Ι', 'Φ', 'Μ', 'Α', 'Μ', 'Ι', 'Ι', 'Α', 'Σ', 'Ο', 'Ν', 'Δ'];
+    final monthLabels = tr(context, el: 'Ι,Φ,Μ,Α,Μ,Ι,Ι,Α,Σ,Ο,Ν,Δ', en: 'J,F,M,A,M,J,J,A,S,O,N,D').split(',');
     return SizedBox(
       height: 80,
       child: Row(
