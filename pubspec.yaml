@@ -90,3 +90,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true   # ενεργοποιεί auto-generation των ARB translations
+  assets:
+    - assets/icons/

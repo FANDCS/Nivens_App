@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 import '../notes/note_editor_screen.dart';
 import '../notes/models/note.dart';
 import '../daily_log/daily_entry_dialog.dart';
 import '../daily_log/daily_stats_screen.dart';
+import '../settings/about_screen.dart';
 import '../settings/settings_screen.dart';
 import '../export/export_service.dart';
 import '../export/export_password_dialog.dart';
@@ -58,6 +60,12 @@ class _HomeScreenState extends State<HomeScreen> {
         onLocaleChanged: widget.onLocaleChanged,
         currentLocale: widget.currentLocale,
       ),
+    ));
+  }
+
+  void _openAbout() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const AboutScreen(),
     ));
   }
 
@@ -204,7 +212,31 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: _tabIndex == 0 ? 'Εξαγωγή σημειώσεων' : 'Εξαγωγή καθημερινών',
             onPressed: _isExportingAll ? null : (_tabIndex == 0 ? _exportAllNotes : _exportAllDaily),
           ),
-          IconButton(icon: const Icon(Icons.settings_outlined), onPressed: _openSettings),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'settings') _openSettings();
+              if (value == 'about') _openAbout();
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'settings',
+                child: Row(children: [
+                  const Icon(Icons.settings_outlined),
+                  const SizedBox(width: 12),
+                  Text(tr(ctx, el: 'Ρυθμίσεις', en: 'Settings')),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'about',
+                child: Row(children: [
+                  const Icon(Icons.info_outline),
+                  const SizedBox(width: 12),
+                  Text(tr(ctx, el: 'Σχετικά', en: 'About')),
+                ]),
+              ),
+            ],
+          ),
         ],
       ),
       body: tabs[_tabIndex],

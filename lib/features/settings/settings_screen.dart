@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 import '../../core/sync/sync_backend.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/sync/sync_settings_store.dart';
-import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final EncryptionService encryptionService;
@@ -88,22 +88,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('Ορισμός κωδικού'),
+          title: Text(tr(ctx, el: 'Ορισμός κωδικού', en: 'Set passphrase')),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: c1, obscureText: true, decoration: const InputDecoration(labelText: 'Νέος κωδικός')),
+            TextField(controller: c1, obscureText: true, decoration: InputDecoration(labelText: tr(ctx, el: 'Νέος κωδικός', en: 'New passphrase'))),
             const SizedBox(height: 8),
-            TextField(controller: c2, obscureText: true, decoration: const InputDecoration(labelText: 'Επιβεβαίωση')),
+            TextField(controller: c2, obscureText: true, decoration: InputDecoration(labelText: tr(ctx, el: 'Επιβεβαίωση', en: 'Confirm'))),
             if (err != null) ...[const SizedBox(height: 8), Text(err!, style: TextStyle(color: Theme.of(ctx).colorScheme.error))],
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Άκυρο')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(ctx, el: 'Άκυρο', en: 'Cancel'))),
             FilledButton(
               onPressed: () {
-                if (c1.text.length < 8) { setS(() => err = 'Τουλάχιστον 8 χαρακτήρες.'); return; }
-                if (c1.text != c2.text) { setS(() => err = 'Δεν ταιριάζουν.'); return; }
+                if (c1.text.length < 8) {
+                  setS(() => err = tr(ctx, el: 'Τουλάχιστον 8 χαρακτήρες.', en: 'At least 8 characters.'));
+                  return;
+                }
+                if (c1.text != c2.text) {
+                  setS(() => err = tr(ctx, el: 'Δεν ταιριάζουν.', en: "Passwords don't match."));
+                  return;
+                }
                 Navigator.of(ctx).pop(true);
               },
-              child: const Text('Αποθήκευση'),
+              child: Text(tr(ctx, el: 'Αποθήκευση', en: 'Save')),
             ),
           ],
         ),
@@ -112,7 +118,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (result == true && mounted) {
       await widget.encryptionService.initializeFromPassphrase(c1.text);
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ο κωδικός ορίστηκε.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr(context, el: 'Ο κωδικός ορίστηκε.', en: 'Passphrase set.'))),
+        );
+      }
     }
   }
 
@@ -138,8 +148,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() => _syncing = false);
     final message = result.ok
-        ? 'Συγχρονίστηκε: ${result.pushed} στάλθηκαν, ${result.pulled} λήφθηκαν'
-        : 'Αποτυχία συγχρονισμού: ${result.error}';
+        ? tr(context,
+            el: 'Συγχρονίστηκε: ${result.pushed} στάλθηκαν, ${result.pulled} λήφθηκαν',
+            en: 'Synced: ${result.pushed} pushed, ${result.pulled} pulled')
+        : tr(context, el: 'Αποτυχία συγχρονισμού: ${result.error}', en: 'Sync failed: ${result.error}');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
@@ -155,19 +167,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await service.testConnection();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Η σύνδεση λειτουργεί.')),
+          SnackBar(content: Text(tr(context, el: 'Η σύνδεση λειτουργεί.', en: 'Connection works.'))),
         );
       }
     } on SyncBackendException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Αποτυχία σύνδεσης: ${e.message}')),
+          SnackBar(content: Text('${tr(context, el: 'Αποτυχία σύνδεσης', en: 'Connection failed')}: ${e.message}')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Αποτυχία σύνδεσης: $e')),
+          SnackBar(content: Text('${tr(context, el: 'Αποτυχία σύνδεσης', en: 'Connection failed')}: $e')),
         );
       }
     } finally {
@@ -175,25 +187,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  String _serverUrlLabel() {
+  String _serverUrlLabel(BuildContext context) {
     switch (_syncBackend) {
       case 'pocketbase':
         return 'PocketBase URL';
       case 'custom':
-        return 'Server URL (δικός σου)';
+        return tr(context, el: 'Server URL (δικός σου)', en: 'Server URL (your own)');
       default:
-        return 'Supabase URL';
+        return tr(context, el: 'Supabase URL', en: 'Supabase URL');
     }
   }
 
-  String _apiKeyLabel() {
+  String _apiKeyLabel(BuildContext context) {
     switch (_syncBackend) {
       case 'pocketbase':
-        return 'PocketBase Admin/Auth Token';
+        return tr(context, el: 'PocketBase Admin/Auth Token', en: 'PocketBase Admin/Auth Token');
       case 'custom':
-        return 'Authorization header (π.χ. Bearer xyz)';
+        return tr(context, el: 'Authorization header (π.χ. Bearer xyz)', en: 'Authorization header (e.g. Bearer xyz)');
       default:
-        return 'Supabase Anon Key';
+        return tr(context, el: 'Supabase Anon Key', en: 'Supabase Anon Key');
     }
   }
 
@@ -205,38 +217,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ρυθμίσεις')),
+      appBar: AppBar(title: Text(tr(context, el: 'Ρυθμίσεις', en: 'Settings'))),
       body: _hasPassphrase == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(children: [
-              // ── Εμφάνιση ──────────────────────────────────────────────────
-              _header('Εμφάνιση'),
-              RadioListTile<ThemeMode>(title: const Text('Σύστημα'), value: ThemeMode.system, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
-              RadioListTile<ThemeMode>(title: const Text('Φωτεινό'), value: ThemeMode.light, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
-              RadioListTile<ThemeMode>(title: const Text('Σκοτεινό'), value: ThemeMode.dark, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
+              // ── Εμφάνιση / Appearance ────────────────────────────────────
+              _header(tr(context, el: 'Εμφάνιση', en: 'Appearance')),
+              RadioListTile<ThemeMode>(title: Text(tr(context, el: 'Σύστημα', en: 'System')), value: ThemeMode.system, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
+              RadioListTile<ThemeMode>(title: Text(tr(context, el: 'Φωτεινό', en: 'Light')), value: ThemeMode.light, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
+              RadioListTile<ThemeMode>(title: Text(tr(context, el: 'Σκοτεινό', en: 'Dark')), value: ThemeMode.dark, groupValue: widget.themeMode, onChanged: (m) => m != null ? widget.onThemeModeChanged(m) : null),
               const Divider(height: 32),
 
-              // ── Γλώσσα ────────────────────────────────────────────────────
-              _header('Γλώσσα'),
-              RadioListTile<Locale?>(title: const Text('Σύστημα'), value: null, groupValue: widget.currentLocale, onChanged: widget.onLocaleChanged),
+              // ── Γλώσσα / Language ────────────────────────────────────────
+              _header(tr(context, el: 'Γλώσσα', en: 'Language')),
+              RadioListTile<Locale?>(title: Text(tr(context, el: 'Σύστημα', en: 'System')), value: null, groupValue: widget.currentLocale, onChanged: widget.onLocaleChanged),
               RadioListTile<Locale?>(title: const Text('Ελληνικά'), value: const Locale('el'), groupValue: widget.currentLocale, onChanged: widget.onLocaleChanged),
               RadioListTile<Locale?>(title: const Text('English'), value: const Locale('en'), groupValue: widget.currentLocale, onChanged: widget.onLocaleChanged),
               const Divider(height: 32),
 
-              // ── Ασφάλεια ──────────────────────────────────────────────────
-              _header('Ασφάλεια'),
+              // ── Ασφάλεια / Security ──────────────────────────────────────
+              _header(tr(context, el: 'Ασφάλεια', en: 'Security')),
               ListTile(
                 leading: Icon(_hasPassphrase! ? Icons.lock : Icons.lock_open),
-                title: const Text('Προστασία με κωδικό'),
+                title: Text(tr(context, el: 'Προστασία με κωδικό', en: 'Passphrase protection')),
                 subtitle: Text(_hasPassphrase!
-                    ? 'Ενεργή — οι σημειώσεις προστατεύονται με τον κωδικό σου.'
-                    : 'Ανενεργή — αυτόματο κλειδί συσκευής.'),
-                trailing: _hasPassphrase! ? null : FilledButton(onPressed: _setPassphraseDialog, child: const Text('Ορισμός')),
+                    ? tr(context, el: 'Ενεργή — οι σημειώσεις προστατεύονται με τον κωδικό σου.', en: 'Enabled — your notes are protected by your passphrase.')
+                    : tr(context, el: 'Ανενεργή — αυτόματο κλειδί συσκευής.', en: 'Disabled — automatic device key.')),
+                trailing: _hasPassphrase! ? null : FilledButton(onPressed: _setPassphraseDialog, child: Text(tr(context, el: 'Ορισμός', en: 'Set'))),
               ),
               const Divider(height: 32),
 
-              // ── Συγχρονισμός ──────────────────────────────────────────────
-              _header('Συγχρονισμός'),
+              // ── Συγχρονισμός / Sync ──────────────────────────────────────
+              _header(tr(context, el: 'Συγχρονισμός', en: 'Sync')),
               if (_syncStore == null)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -244,8 +256,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 )
               else ...[
                 SwitchListTile(
-                  title: const Text('Ενεργοποίηση συγχρονισμού'),
-                  subtitle: const Text('Συγχρονίζει σημειώσεις & καθημερινά μεταξύ συσκευών, κρυπτογραφημένα.'),
+                  title: Text(tr(context, el: 'Ενεργοποίηση συγχρονισμού', en: 'Enable sync')),
+                  subtitle: Text(tr(context,
+                      el: 'Συγχρονίζει σημειώσεις & καθημερινά μεταξύ συσκευών, κρυπτογραφημένα.',
+                      en: 'Syncs notes & daily entries across devices, end-to-end encrypted.')),
                   value: _syncEnabled,
                   onChanged: (v) => setState(() {
                     _syncEnabled = v;
@@ -256,14 +270,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: DropdownButtonFormField<String>(
                     initialValue: _syncBackend,
-                    decoration: const InputDecoration(
-                      labelText: 'Πάροχος backend',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: tr(context, el: 'Πάροχος backend', en: 'Backend provider'),
+                      border: const OutlineInputBorder(),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'supabase', child: Text('Supabase')),
-                      DropdownMenuItem(value: 'pocketbase', child: Text('PocketBase')),
-                      DropdownMenuItem(value: 'custom', child: Text('Custom REST (δικός σου server)')),
+                    items: [
+                      const DropdownMenuItem(value: 'supabase', child: Text('Supabase')),
+                      const DropdownMenuItem(value: 'pocketbase', child: Text('PocketBase')),
+                      DropdownMenuItem(value: 'custom', child: Text(tr(context, el: 'Custom REST (δικός σου server)', en: 'Custom REST (your own server)'))),
                     ],
                     onChanged: (v) => setState(() {
                       _syncBackend = v ?? 'supabase';
@@ -278,7 +292,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: _urlController,
                     onChanged: (_) => setState(() => _syncSettingsSaved = false),
                     decoration: InputDecoration(
-                      labelText: _serverUrlLabel(),
+                      labelText: _serverUrlLabel(context),
                       border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.url,
@@ -292,7 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (_) => setState(() => _syncSettingsSaved = false),
                     obscureText: true,
                     decoration: InputDecoration(
-                      labelText: _apiKeyLabel(),
+                      labelText: _apiKeyLabel(context),
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -303,11 +317,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: TextField(
                     controller: _deviceIdController,
                     onChanged: (_) => setState(() => _syncSettingsSaved = false),
-                    decoration: const InputDecoration(
-                      labelText: 'Όνομα/ID αυτής της εγκατάστασης',
-                      hintText: 'π.χ. laptop-sto-grafeio',
-                      helperText: 'Χρησιμοποιείται μόνο για να ξέρεις ποια συσκευή δημιούργησε τι.',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: tr(context, el: 'Όνομα/ID αυτής της εγκατάστασης', en: 'Name/ID of this installation'),
+                      hintText: tr(context, el: 'π.χ. laptop-sto-grafeio', en: 'e.g. work-laptop'),
+                      helperText: tr(context,
+                          el: 'Χρησιμοποιείται μόνο για να ξέρεις ποια συσκευή δημιούργησε τι.',
+                          en: 'Only used so you know which device created what.'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -318,10 +334,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: _encryptionPasswordController,
                     onChanged: (_) => setState(() => _syncSettingsSaved = false),
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Κωδικός κρυπτογράφησης συγχρονισμού',
-                      helperText: 'Ίδιος κωδικός σε ΟΛΕΣ τις συσκευές σου — δεν αποθηκεύεται ποτέ στο backend.',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: tr(context, el: 'Κωδικός κρυπτογράφησης συγχρονισμού', en: 'Sync encryption passphrase'),
+                      helperText: tr(context,
+                          el: 'Ίδιος κωδικός σε ΟΛΕΣ τις συσκευές σου — δεν αποθηκεύεται ποτέ στο backend.',
+                          en: 'Same passphrase on ALL your devices — never stored on the backend.'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -334,7 +352,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: FilledButton.icon(
                           onPressed: _syncing ? null : _saveSyncSettings,
                           icon: Icon(_syncSettingsSaved ? Icons.check : Icons.save_outlined),
-                          label: Text(_syncSettingsSaved ? 'Αποθηκεύτηκε' : 'Αποθήκευση'),
+                          label: Text(_syncSettingsSaved
+                              ? tr(context, el: 'Αποθηκεύτηκε', en: 'Saved')
+                              : tr(context, el: 'Αποθήκευση', en: 'Save')),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -342,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: OutlinedButton.icon(
                           onPressed: _syncing ? null : _testConnection,
                           icon: const Icon(Icons.wifi_tethering),
-                          label: const Text('Δοκιμή σύνδεσης'),
+                          label: Text(tr(context, el: 'Δοκιμή σύνδεσης', en: 'Test connection')),
                         ),
                       ),
                     ],
@@ -360,21 +380,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.sync),
-                    label: const Text('Συγχρονισμός τώρα'),
+                    label: Text(tr(context, el: 'Συγχρονισμός τώρα', en: 'Sync now')),
                   ),
                 ),
               ],
-              const Divider(height: 32),
-
-              // ── Σχετικά ───────────────────────────────────────────────────
-              _header('Σχετικά'),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('Σχετικά με την εφαρμογή'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
             ]),
     );
   }
