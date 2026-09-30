@@ -10,7 +10,11 @@ import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
 import '../notes/models/note.dart';
 import '../pdf/pdf_viewer_screen.dart';
+import 'encoding_converter_screen.dart';
 import 'export_service.dart';
+import 'qr_import_dialog.dart';
+import '../import/doc_reader.dart';
+import '../import/docx_reader.dart';
 
 class ImportScreen extends StatefulWidget {
   final AppDatabase database;
@@ -33,7 +37,7 @@ class _ImportScreenState extends State<ImportScreen> {
   Future<void> _pickAndImport() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['md', 'txt', 'json', 'pdf', 'notesbackup'],
+      allowedExtensions: ['md', 'txt', 'fnotes', 'json', 'pdf', 'doc', 'docx', 'notesbackup'],
     );
     if (result == null || result.files.isEmpty) return;
 
@@ -50,6 +54,8 @@ class _ImportScreenState extends State<ImportScreen> {
         await _importEncryptedBackup(path);
       } else if (ext == 'json') {
         await _importJson(path);
+      } else if (ext == 'doc' || ext == 'docx') {
+        await _importWordFile(path, ext);
       } else if (ext == 'pdf') {
         final viewOnly = await _askPdfViewOnly();
         if (viewOnly == true) {
@@ -63,7 +69,7 @@ class _ImportScreenState extends State<ImportScreen> {
         }
         await _importPdf(path);
       } else {
-        // md / txt
+        // md / txt / fnotes
         await _importPlainText(path, ext);
       }
     } catch (e) {
@@ -71,6 +77,28 @@ class _ImportScreenState extends State<ImportScreen> {
     } finally {
       if (mounted) setState(() => _isImporting = false);
     }
+  }
+
+  Future<void> _importWordFile(String path, String ext) async {
+    final file = File(path);
+    if (ext == 'doc') {
+      final content = await DocReader.readFile(file);
+      await _saveNoteFromMarkdown(content.markdown, title: content.title);
+    } else {
+      final docx = await DocxReader.readFile(file);
+      await _saveNoteFromMarkdown(
+        docx.markdownWithImages,
+        title: File(path).uri.pathSegments.last.replaceAll('.docx', ''),
+      );
+    }
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθη το έγγραφο ως σημείωση.', en: 'Imported the document as a note.'));
+  }
+
+  Future<void> _importViaQr() async {
+    final raw = await showQrImportDialog(context: context);
+    if (raw == null || !mounted) return;
+    await _saveNoteFromMarkdown(raw);
+    setState(() => _statusMessage = tr(context, el: 'Εισήχθη 1 σημείωση (QR).', en: 'Imported 1 note (QR).'));
   }
 
   Future<void> _importEncryptedBackup(String path) async {
@@ -104,7 +132,7 @@ class _ImportScreenState extends State<ImportScreen> {
       if (name.endsWith('.json')) {
         await _saveNoteFromJson(content);
       } else {
-        await _saveNoteFromMarkdown(content, title: name.replaceAll(RegExp(r'\.(md|txt)$'), ''));
+        await _saveNoteFromMarkdown(content, title: name.replaceAll(RegExp(r'\.(md|txt|fnotes)$'), ''));
       }
       count++;
     }
@@ -227,26 +255,47 @@ class _ImportScreenState extends State<ImportScreen> {
               Text(
                 tr(context,
                     el: 'Υποστηριζόμενες μορφές:\n'
+                        '.fnotes — Το φυσικό format της εφαρμογής\n'
                         '.md / .txt — Markdown ή απλό κείμενο\n'
+                        '.doc / .docx — Έγγραφο Word (μόνο κείμενο)\n'
                         '.json — Εξαγωγή σε JSON\n'
                         '.pdf — Προβολή ως PDF ή εξαγωγή κειμένου\n'
-                        '.notesbackup — Κρυπτογραφημένο backup (με κωδικό)',
+                        '.notesbackup — Κρυπτογραφημένο backup (με κωδικό)\n'
+                        'QR — από κάμερα ή επικόλληση',
                     en: 'Supported formats:\n'
+                        '.fnotes — The app\'s native format\n'
                         '.md / .txt — Markdown or plain text\n'
+                        '.doc / .docx — Word document (text only)\n'
                         '.json — JSON export\n'
                         '.pdf — View as PDF or extract text\n'
-                        '.notesbackup — Encrypted backup (password)'),
+                        '.notesbackup — Encrypted backup (password)\n'
+                        'QR — from camera or paste'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               if (_isImporting)
                 const CircularProgressIndicator()
-              else
+              else ...[
                 FilledButton.icon(
                   onPressed: _pickAndImport,
                   icon: const Icon(Icons.folder_open_outlined),
                   label: Text(tr(context, el: 'Επιλογή αρχείου', en: 'Choose file')),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _importViaQr,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: Text(tr(context, el: 'Εισαγωγή μέσω QR', en: 'Import via QR')),
+                ),
+                const SizedBox(height: 24),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EncodingConverterScreen()),
+                  ),
+                  icon: const Icon(Icons.translate_outlined),
+                  label: Text(tr(context, el: 'Μετατροπή κωδικοποίησης αρχείου', en: 'Convert file encoding')),
+                ),
+              ],
               if (_statusMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(_statusMessage!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),

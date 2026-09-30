@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
+import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/storage/app_database.dart';
@@ -21,8 +22,11 @@ import '../drawing/drawing_screen.dart';
 import '../export/export_service.dart';
 import '../export/export_password_dialog.dart';
 import '../export/export_format_menu.dart';
+import '../export/pdf_export_service.dart';
 import '../export/qr_export_dialog.dart';
+import '../export/qr_import_dialog.dart';
 import '../export/termbin_service.dart';
+import '../import/doc_reader.dart';
 import '../import/docx_reader.dart';
 import '../pdf/pdf_viewer_screen.dart';
 import 'models/note.dart';
@@ -237,6 +241,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Toggle line prefix: αφαιρεί αν ΗΔΗ υπάρχει, αλλιώς προσθέτει.
+  /// Βρίσκει την n-οστή γραμμή "- [ ]" / "- [x]" στο raw markdown (με τη
+  /// σειρά που τις βλέπει ο parser, δηλ. index == η σειρά κλήσης του
+  /// checkboxBuilder) και αντιστρέφει το checked/unchecked της.
+  static final RegExp _checkboxLinePattern =
+      RegExp(r'^(\s*[-*+]\s+)\[([ xX])\]', multiLine: true);
+
+  void _toggleCheckboxAt(int index) {
+    final text = _bodyController.text;
+    final matches = _checkboxLinePattern.allMatches(text).toList();
+    if (index < 0 || index >= matches.length) return;
+    final m = matches[index];
+    final wasChecked = m.group(2)!.toLowerCase() == 'x';
+    final replacement = '${m.group(1)}[${wasChecked ? ' ' : 'x'}]';
+    setState(() {
+      _bodyController.text = text.replaceRange(m.start, m.end, replacement);
+    });
+  }
+
   void _togglePrefix(String prefix) {
     final ctrl = _bodyController;
     final text = ctrl.text;
@@ -560,7 +582,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Future<void> _importFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['md', 'txt', 'json', 'pdf', 'docx', 'rtf'],
+      allowedExtensions: ['md', 'txt', 'fnotes', 'json', 'pdf', 'docx', 'doc', 'rtf'],
     );
     if (result == null || result.files.isEmpty) return;
     final file = File(result.files.single.path!);
@@ -594,8 +616,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           _titleController.text = p.basenameWithoutExtension(file.path);
         }
       } else if (ext == 'doc') {
-        throw const FormatException(
-            'Το παλιό .doc (Word 97-2003) δεν υποστηρίζεται — αποθήκευσέ το ως .docx');
+        final docContent = await DocReader.readFile(file);
+        content = docContent.markdown;
+        if (_titleController.text.trim().isEmpty) {
+          _titleController.text = docContent.title;
+        }
+      } else if (ext == 'fnotes') {
+        final raw = await file.readAsString();
+        try {
+          final parsed = NoteDocument.fromMarkdownFile(raw);
+          if (_titleController.text.trim().isEmpty) _titleController.text = parsed.title;
+          setState(() {
+            _note!.tags = parsed.tags;
+            _note!.font = parsed.font;
+            _note!.fontSize = parsed.fontSize;
+          });
+          content = parsed.body;
+        } catch (_) {
+          // Δεν είχε έγκυρο front-matter — μεταχειρίσου το ως απλό κείμενο.
+          content = raw;
+        }
       } else if (ext == 'json') {
         final raw = await file.readAsString();
         final decoded = jsonDecode(raw);
@@ -614,6 +654,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
+  Future<void> _importViaQr() async {
+    final raw = await showQrImportDialog(context: context);
+    if (raw == null || !mounted) return;
+    try {
+      final parsed = NoteDocument.fromMarkdownFile(raw);
+      if (_titleController.text.trim().isEmpty) _titleController.text = parsed.title;
+      setState(() {
+        _note!.tags = parsed.tags;
+        _note!.font = parsed.font;
+        _note!.fontSize = parsed.fontSize;
+      });
+      _bodyController.text = parsed.body;
+    } catch (_) {
+      _bodyController.text = raw;
+    }
+  }
+
   // ── EXPORT ─────────────────────────────────────────────────────────────────
 
   Future<void> _exportThisNote() async {
@@ -622,6 +679,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     setState(() => _isExporting = true);
     try {
       final safeTitle = (_note!.title.isEmpty ? 'note' : _note!.title).replaceAll(RegExp(r'[^\w\-]+'), '_');
+      if (choice.format == ExportFormat.pdf || choice.format == ExportFormat.print) {
+        final bytes = await PdfExportService.buildNotePdf(
+          title: _titleController.text.trim(),
+          body: _bodyController.text,
+        );
+        if (choice.format == ExportFormat.print) {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: safeTitle);
+          return;
+        }
+        final dir = await NivensFolder.sub('exports');
+        final path = p.join(dir.path, '$safeTitle.pdf');
+        await File(path).writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')),
+          );
+        }
+        return;
+      }
       final content = choice.format == ExportFormat.json ? _noteAsJson() : _note!.toMarkdownFile();
       if (choice.format == ExportFormat.qr) {
         if (mounted) showQrExportDialog(context: context, data: content);
@@ -631,10 +707,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         await _uploadToTermbin();
         return;
       }
-      final ext = choice.format == ExportFormat.json ? 'json' : 'md';
+      // Το native format της εφαρμογής (YAML front-matter + markdown σώμα)
+      // εξάγεται πλέον ως .fnotes αντί για .md.
+      final ext = choice.format == ExportFormat.json ? 'json' : 'fnotes';
       if (!choice.encrypted) {
         final path = await ExportService().exportPlainFile(content: content, filename: '$safeTitle.$ext');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Εξήχθη: $path')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
         return;
       }
       final password = await showExportPasswordDialog(
@@ -645,7 +723,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       final path = await ExportService().exportEncryptedZip(
         files: {'$safeTitle.$ext': content}, password: password, outputNamePrefix: 'note_export',
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Εξήχθη: $path')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
@@ -775,6 +853,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             onSelected: (value) {
               switch (value) {
                 case 'import': _importFile(); break;
+                case 'import_qr': _importViaQr(); break;
                 case 'export': _exportThisNote(); break;
                 case 'delete': _delete(); break;
               }
@@ -785,6 +864,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.file_open_outlined),
                   title: Text(tr(context, el: 'Εισαγωγή αρχείου', en: 'Import file')),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'import_qr',
+                child: ListTile(
+                  leading: const Icon(Icons.qr_code_scanner),
+                  title: Text(tr(context, el: 'Εισαγωγή μέσω QR', en: 'Import via QR')),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -1133,10 +1220,33 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 // όλα" να μην είναι διάφανο.
                 color: Theme.of(context).scaffoldBackgroundColor,
                 padding: const EdgeInsets.all(16),
-                child: MarkdownBody(
+                child: Builder(builder: (context) {
+                  // flutter_markdown δεν κάνει tappable τα [ ] checkboxes από
+                  // μόνο του (τα σχεδιάζει σαν στατικό εικονίδιο) — το
+                  // counter εδώ ταιριάζει κάθε κλήση του checkboxBuilder με
+                  // την n-οστή γραμμή "- [ ]"/"- [x]" στο raw markdown, ώστε
+                  // το tap να ξέρει ποια γραμμή να αλλάξει.
+                  var checkboxIndex = 0;
+                  return MarkdownBody(
                   data: _bodyController.text,
                   selectable: true,
                   extensionSet: md.ExtensionSet.gitHubFlavored,
+                  checkboxBuilder: (checked) {
+                    final index = checkboxIndex++;
+                    return GestureDetector(
+                      onTap: () => _toggleCheckboxAt(index),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Icon(
+                          checked ? Icons.check_box : Icons.check_box_outline_blank,
+                          size: 20,
+                          color: checked
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  },
                   imageBuilder: (uri, title, alt) {
                     final uriStr = uri.toString();
                     final widthPercent = (title != null && title.startsWith('w='))
@@ -1195,7 +1305,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       border: Border(left: BorderSide(color: Theme.of(context).colorScheme.primary, width: 4)),
                     ),
                   ),
-                ),
+                  );
+                }),
               ),
 
                   // ── OVERLAY LAYER (ζωγραφική) ─────────────────────────

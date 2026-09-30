@@ -7,7 +7,9 @@ import 'package:path/path.dart' as p;
 import '../../core/storage/nivens_folder.dart';
 
 /// Μορφή εξαγωγής για μία σημείωση.
-enum ExportFormat { markdown, json, qr, termbin }
+/// `markdown` = το ΔΙΚΟ ΜΑΣ note format (YAML front-matter + markdown σώμα),
+/// αποθηκεύεται πλέον με επέκταση **.fnotes** (πριν ήταν .md).
+enum ExportFormat { markdown, json, qr, termbin, pdf, print }
 
 /// Δημιουργεί encrypted export αρχεία (.notesbackup): zip στη μνήμη +
 /// AES-256-GCM encryption ολόκληρου του zip με κλειδί που παράγεται
@@ -128,7 +130,7 @@ class ExportService {
     return dir
         .listSync()
         .whereType<File>()
-        .where((f) => const ['.md', '.json', '.notesbackup', '.txt']
+        .where((f) => const ['.fnotes', '.md', '.json', '.notesbackup', '.txt']
             .any((ext) => f.path.endsWith(ext)))
         .toList()
       ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));

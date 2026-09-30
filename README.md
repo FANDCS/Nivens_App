@@ -25,6 +25,22 @@ sqlcipher conflict, κ.λπ.)
   Custom REST) με end-to-end κρυπτογράφηση AES-256-GCM ανά εγγραφή,
   καλωδιωμένο στις Ρυθμίσεις (ενότητα "Συγχρονισμός") — δες core/sync/
   και sync-backend/*.md. Συγχρονίζει σημειώσεις και καθημερινά
+- Native note format: **.fnotes** (πρώην .md) — YAML front-matter + markdown
+  σώμα, δες `NoteDocument.toMarkdownFile()`/`fromMarkdownFile()`
+- Εξαγωγή σημείωσης: .fnotes, JSON, **PDF**, **Εκτύπωση** (μέσω `printing`,
+  ίδιο PDF), QR (χωρίς κωδικό, για σύντομες σημειώσεις), termbin.com, ή ZIP
+  με κωδικό (.fnotes/JSON μέσα) — δες `features/export/`
+- Εισαγωγή: .fnotes, .md/.txt, **.doc** (Word 97-2003, δικός μας OLE2/CFB +
+  FIB parser χωρίς εξωτερικό πακέτο — μόνο κείμενο), .docx, .json, .pdf,
+  .notesbackup, και **QR** (σάρωση κάμερας σε Android/iOS/macOS, ή
+  επικόλληση κειμένου παντού) — δες `features/import/doc_reader.dart` και
+  `features/export/qr_import_dialog.dart`
+- **Μετατροπή κωδικοποίησης αρχείου**: ανιχνεύει (ή ορίζεις εσύ) την πηγή
+  ενός οποιουδήποτε αρχείου κειμένου (UTF-8/16, Windows-1253/1252/1251,
+  ISO-8859-7/1) και το αποθηκεύει σε άλλη κωδικοποίηση, με προεπισκόπηση
+  πριν την αποθήκευση — δες `core/text_encoding.dart` και
+  `features/export/encoding_converter_screen.dart`. Ανεξάρτητο εργαλείο,
+  δεν αγγίζει τα δεδομένα της εφαρμογής
 
 ## Νέα (αυτή η έκδοση)
 
@@ -47,9 +63,15 @@ sqlcipher conflict, κ.λπ.)
 
 ## Επόμενα βήματα
 
-- [ ] Import/restore από .notesbackup αρχείο
-- [ ] Καλωδίωση SupabaseSyncService σε background trigger
+- [x] Import/restore από .notesbackup αρχείο
+- [ ] Αυτόματος (background) συγχρονισμός — προς το παρόν μόνο χειροκίνητο
+      "Συγχρονισμός τώρα" στις Ρυθμίσεις
 - [ ] Πλούσιο rich-text editor (πάνω από markdown) — attachments
 - [x] Γραμματοσειρές ανά σημείωση
 - [x] Ζωγραφική ως πάνω layer + ζουμ στην Προβολή
-- [ ] Υποστήριξη παλιού binary .doc (Word 97-2003)
+- [x] Υποστήριξη παλιού binary .doc (Word 97-2003) — μόνο κείμενο
+- [x] Εξαγωγή ως PDF + Εκτύπωση
+- [x] Εισαγωγή μέσω QR (κάμερα ή επικόλληση)
+- [x] Μετατροπή κωδικοποίησης αρχείου (UTF-8/16, Windows-125x, ISO-8859-x)
+- [x] Native format μετονομάστηκε σε .fnotes (πρώην .md)
+- [x] Tappable task-list checkboxes στην Προβολή (πριν ήταν μόνο στατικά)

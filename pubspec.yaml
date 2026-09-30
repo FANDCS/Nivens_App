@@ -66,8 +66,17 @@ dependencies:
   # --- Charts ---
   fl_chart: ^0.69.0
 
-  # --- QR export ---
+  # --- QR export / εισαγωγή ---
   qr_flutter: ^4.1.0
+  # Σάρωση QR με κάμερα — μόνο Android/iOS/macOS/web (δηλώνεται έτσι από
+  # το ίδιο το πακέτο· σε Linux desktop απλά δεν καταχωρείται καμία native
+  # υλοποίηση, οπότε το build δεν επηρεάζεται — απλώς κρύβουμε το κουμπί
+  # σάρωσης με κάμερα εκεί, δες lib/features/export/qr_import_dialog.dart).
+  mobile_scanner: ^7.0.1
+
+  # --- Εξαγωγή σε PDF / Εκτύπωση ---
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
   # --- State / prefs ---
   flutter_riverpod: ^2.6.1
@@ -92,3 +101,22 @@ flutter:
   generate: true   # ενεργοποιεί auto-generation των ARB translations
   assets:
     - assets/icons/
+  fonts:
+    # Χρησιμοποιείται ΜΟΝΟ από τον PDF exporter/εκτυπωτή (lib/features/export/pdf_export_service.dart) — όχι από
+    # το UI της εφαρμογής, που έχει τις δικές του γραμματοσειρές μέσω
+    # google_fonts. Το Noto Sans (SIL OFL) καλύπτει πλήρως το ελληνικό
+    # αλφάβητο, ώστε τα PDF να μη "σπάνε" ποτέ σε ελληνικό κείμενο ακόμα κι
+    # αν η συσκευή δεν έχει σύνδεση για να κατέβει κάποιο google font.
+    - family: NotoSansPdf
+      fonts:
+        - asset: assets/fonts/NotoSans-Regular.ttf
+        - asset: assets/fonts/NotoSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NotoSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/NotoSans-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: NotoSansMonoPdf
+      fonts:
+        - asset: assets/fonts/NotoSansMono-Regular.ttf

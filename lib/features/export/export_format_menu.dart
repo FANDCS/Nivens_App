@@ -9,8 +9,9 @@ class ExportChoice {
   const ExportChoice({required this.format, required this.encrypted});
 }
 
-/// Πρώτο βήμα: JSON / Markdown / QR (απλά, χωρίς κωδικό) ή ZIP
-/// (κρυπτογραφημένο, θα ρωτήσει μετά για κωδικό + εσωτερική μορφή).
+/// Πρώτο βήμα: Nivens (.fnotes) / JSON / PDF / Εκτύπωση / QR (απλά, χωρίς
+/// κωδικό) ή ZIP (κρυπτογραφημένο, θα ρωτήσει μετά για κωδικό + εσωτερική
+/// μορφή — μόνο .fnotes/JSON, το PDF/εκτύπωση δεν έχουν νόημα μέσα σε zip).
 Future<ExportChoice?> showExportFormatMenu({
   required BuildContext context,
   bool allowQr = true,
@@ -32,8 +33,8 @@ Future<ExportChoice?> showExportFormatMenu({
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
-            title: const Text('Markdown (.md)'),
-            subtitle: Text(tr(context, el: 'Απλό αρχείο, χωρίς κωδικό', en: 'Plain file, no password')),
+            title: const Text('Nivens (.fnotes)'),
+            subtitle: Text(tr(context, el: 'Το φυσικό format της εφαρμογής, χωρίς κωδικό', en: "The app's native format, no password")),
             onTap: () => Navigator.of(context).pop('markdown'),
           ),
           ListTile(
@@ -41,6 +42,18 @@ Future<ExportChoice?> showExportFormatMenu({
             title: const Text('JSON'),
             subtitle: Text(tr(context, el: 'Απλό αρχείο, χωρίς κωδικό', en: 'Plain file, no password')),
             onTap: () => Navigator.of(context).pop('json'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('PDF'),
+            subtitle: Text(tr(context, el: 'Απλό αρχείο, χωρίς κωδικό', en: 'Plain file, no password')),
+            onTap: () => Navigator.of(context).pop('pdf'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.print_outlined),
+            title: Text(tr(context, el: 'Εκτύπωση', en: 'Print')),
+            subtitle: Text(tr(context, el: 'Ανοίγει τον διάλογο εκτύπωσης (ή αποθήκευση ως PDF)', en: 'Opens the print dialog (or save as PDF)')),
+            onTap: () => Navigator.of(context).pop('print'),
           ),
           if (allowQr)
             ListTile(
@@ -74,6 +87,8 @@ Future<ExportChoice?> showExportFormatMenu({
   if (firstChoice == 'json') return const ExportChoice(format: ExportFormat.json, encrypted: false);
   if (firstChoice == 'qr') return const ExportChoice(format: ExportFormat.qr, encrypted: false);
   if (firstChoice == 'termbin') return const ExportChoice(format: ExportFormat.termbin, encrypted: false);
+  if (firstChoice == 'pdf') return const ExportChoice(format: ExportFormat.pdf, encrypted: false);
+  if (firstChoice == 'print') return const ExportChoice(format: ExportFormat.print, encrypted: false);
 
   // firstChoice == 'zip' -> ρώτα ΕΠΙΠΛΕΟΝ ποια μορφή θα μπει μέσα στο zip
   if (!context.mounted) return null;
@@ -93,7 +108,7 @@ Future<ExportChoice?> showExportFormatMenu({
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
-            title: const Text('Markdown (.md)'),
+            title: const Text('Nivens (.fnotes)'),
             onTap: () => Navigator.of(context).pop('markdown'),
           ),
           ListTile(
