@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_linux
   flutter_secure_storage_linux
   gtk
+  printing
   record_linux
   sqlcipher_flutter_libs
   syncfusion_pdfviewer_linux
