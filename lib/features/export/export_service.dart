@@ -9,7 +9,9 @@ import '../../core/storage/nivens_folder.dart';
 /// Μορφή εξαγωγής για μία σημείωση.
 /// `markdown` = το ΔΙΚΟ ΜΑΣ note format (YAML front-matter + markdown σώμα),
 /// αποθηκεύεται πλέον με επέκταση **.fnotes** (πριν ήταν .md).
-enum ExportFormat { markdown, json, qr, termbin, pdf, print }
+/// `plainMarkdown` = ΜΟΝΟ το σώμα σε καθαρό .md, ΧΩΡΙΣ front-matter — για
+/// εισαγωγή σε άλλες εφαρμογές markdown.
+enum ExportFormat { markdown, plainMarkdown, json, qr, termbin, pdf, print }
 
 /// Δημιουργεί encrypted export αρχεία (.notesbackup): zip στη μνήμη +
 /// AES-256-GCM encryption ολόκληρου του zip με κλειδί που παράγεται

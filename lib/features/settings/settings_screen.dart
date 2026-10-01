@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/dev_mode.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/i18n.dart';
 import '../../core/storage/app_database.dart';
@@ -244,6 +245,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? tr(context, el: 'Ενεργή — οι σημειώσεις προστατεύονται με τον κωδικό σου.', en: 'Enabled — your notes are protected by your passphrase.')
                     : tr(context, el: 'Ανενεργή — αυτόματο κλειδί συσκευής.', en: 'Disabled — automatic device key.')),
                 trailing: _hasPassphrase! ? null : FilledButton(onPressed: _setPassphraseDialog, child: Text(tr(context, el: 'Ορισμός', en: 'Set'))),
+              ),
+              const Divider(height: 32),
+
+              // ── Λειτουργία προγραμματιστή / Developer mode ────────────────
+              _header(tr(context, el: 'Προχωρημένα', en: 'Advanced')),
+              ValueListenableBuilder<bool>(
+                valueListenable: DevMode.enabled,
+                builder: (context, devMode, _) => SwitchListTile(
+                  title: Text(tr(context, el: 'Λειτουργία προγραμματιστή', en: 'Developer mode')),
+                  subtitle: Text(devMode
+                      ? tr(context,
+                          el: 'Ενεργή — η επεξεργασία σημειώσεων δείχνει το raw markdown (**, #, κ.λπ.)',
+                          en: 'Enabled — note editing shows raw markdown (**, #, etc.)')
+                      : tr(context,
+                          el: 'Ανενεργή — η επεξεργασία μοιάζει με κλασική εφαρμογή σημειώσεων (το bold φαίνεται έντονο, χωρίς σύμβολα)',
+                          en: 'Disabled — editing looks like a classic notes app (bold looks bold, no symbols)')),
+                  value: devMode,
+                  onChanged: (v) => DevMode.setEnabled(v),
+                ),
               ),
               const Divider(height: 32),
 

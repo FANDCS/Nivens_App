@@ -5,8 +5,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'core/dev_mode.dart';
 import 'core/encryption/encryption_service.dart';
 import 'core/storage/app_database.dart';
+import 'core/text_encoding.dart';
+import 'features/import/doc_reader.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/notes/note_editor_screen.dart';
@@ -37,6 +40,7 @@ Future<void> main() async {
   //   SyncfusionLicense.registerLicense(syncfusionLicenseKey);
   // }
   final prefs = await SharedPreferences.getInstance();
+  await DevMode.ensureLoaded();
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
@@ -180,9 +184,16 @@ class _RootRouterState extends State<_RootRouter> {
   }
 
   /// Διαβάζει το αρχείο που ήρθε από την εξερεύνηση αρχείων και το
-  /// μετατρέπει σε (τίτλος, περιεχόμενο markdown).
-  /// Υποστηρίζονται: .pdf (εξαγωγή κειμένου), .docx (Word), .md/.txt/άλλα.
-  Future<(String, String)?> _readIntentFile(String path) async {
+  /// μετατρέπει σε (τίτλος, περιεχόμενο markdown, ανιχνευμένη κωδικοποίηση
+  /// κειμένου — μόνο για md/txt/fnotes/κ.λπ., αλλιώς null).
+  /// Υποστηρίζονται: .pdf (εξαγωγή κειμένου), .doc/.docx (Word), .md/.txt/
+  /// .fnotes/άλλα (απλό κείμενο, με αυτόματη ανίχνευση κωδικοποίησης ώστε
+  /// να μην "σπάνε" τα ελληνικά σε παλιά αρχεία Windows-1253).
+  /// Η κωδικοποίηση επιστρέφεται (αντί για null) ΜΟΝΟ όταν το αρχείο μπορεί
+  /// αργότερα να ξανα-αποθηκευτεί στο ΙΔΙΟ path (βλ. "Αποθήκευση" στον
+  /// editor για αρχεία που ανοίχτηκαν έξω από την εφαρμογή) — .pdf/.docx/
+  /// .doc δεν ξαναγράφονται στην αρχική τους μορφή, οπότε δεν έχει νόημα.
+  Future<(String, String, TextEncoding?)?> _readIntentFile(String path) async {
     final file = File(path);
     final ext = path.split('.').last.toLowerCase();
     final baseName = path.split('/').last.replaceAll(RegExp(r'\.\w+$'), '');
@@ -196,13 +207,18 @@ class _RootRouterState extends State<_RootRouter> {
           buf.writeln(extractor.extractText(startPageIndex: i, endPageIndex: i));
         }
         doc.dispose();
-        return (baseName, buf.toString());
+        return (baseName, buf.toString(), null);
       } else if (ext == 'docx') {
         final docx = await DocxReader.readFile(file);
-        return (baseName, docx.markdownWithImages);
+        return (baseName, docx.markdownWithImages, null);
+      } else if (ext == 'doc') {
+        final doc = await DocReader.readFile(file);
+        return (doc.title, doc.markdown, null);
       } else {
-        final content = await file.readAsString();
-        return (baseName, content);
+        final bytes = await file.readAsBytes();
+        final encoding = TextCodecs.detect(bytes);
+        final content = TextCodecs.decode(bytes, encoding);
+        return (baseName, content, encoding);
       }
     } catch (_) { return null; }
   }
@@ -282,7 +298,7 @@ class _RootRouterState extends State<_RootRouter> {
                   title: _intentFilePath!.split('/').last,
                 );
               }
-              return FutureBuilder<(String, String)?>(
+              return FutureBuilder<(String, String, TextEncoding?)?>(
                 future: _readIntentFile(_intentFilePath!),
                 builder: (context, fileSnapshot) {
                   if (!fileSnapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -293,6 +309,12 @@ class _RootRouterState extends State<_RootRouter> {
                     encryptionService: widget.encryptionService,
                     initialTitle: data.$1,
                     initialContent: data.$2,
+                    // Μόνο τα text-like formats (md/txt/fnotes/κ.λπ.) έχουν
+                    // ανιχνευμένη κωδικοποίηση (βλ. _readIntentFile) — μόνο
+                    // τότε έχει νόημα το "Αποθήκευση" να ξαναγράφει στο ΙΔΙΟ
+                    // εξωτερικό αρχείο αντί να φτιάχνει μόνο μια νέα εσωτερική σημείωση.
+                    originFilePath: data.$3 != null ? _intentFilePath : null,
+                    originEncoding: data.$3,
                   );
                 },
               );

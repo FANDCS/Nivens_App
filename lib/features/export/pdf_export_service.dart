@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -15,7 +16,11 @@ import 'package:pdf/widgets.dart' as pw;
 /// Υποστηρίζει ένα ΠΡΑΚΤΙΚΟ υποσύνολο του markdown της εφαρμογής:
 /// επικεφαλίδες (#/##/###), **bold**, *italic*, `inline code`, code blocks
 /// (```), λίστες (- / 1.), task list ([ ]/[x]), blockquote (>) και απλούς
-/// πίνακες (| a | b |). ΔΕΝ αποδίδει εικόνες ή το drawing overlay.
+/// πίνακες (| a | b |). Αν δοθεί [buildNotePdf.overlayBytes] (η ζωγραφιά
+/// "πάνω από όλα" της σημείωσης), μπαίνει σε ΔΙΚΗ ΤΗΣ σελίδα στο τέλος —
+/// δεν στοιχίζεται pixel-perfect πάνω στο κείμενο, αλλά πλέον ΦΑΙΝΕΤΑΙ.
+/// Ενσωματωμένες εικόνες μέσα στο markdown (`![...](file://...)`) δεν
+/// αποδίδονται ακόμα.
 class PdfExportService {
   PdfExportService._();
 
@@ -33,6 +38,7 @@ class PdfExportService {
     required String title,
     required String body,
     double fontSize = 11,
+    Uint8List? overlayBytes,
   }) async {
     await _ensureFonts();
     final doc = pw.Document();
@@ -68,7 +74,44 @@ class PdfExportService {
         ],
       ),
     );
+
+    // Η ζωγραφιά (overlay layer πάνω από όλη τη σημείωση, βλ.
+    // note_editor_screen._drawOverEverything) δεν είναι μέρος του markdown
+    // -- δεν υπάρχει αξιόπιστος τρόπος να "στοιχηθεί" pixel-perfect πάνω
+    // στο ήδη paginated κείμενο (διαφορετική μηχανή rendering). Μπαίνει σε
+    // δική της σελίδα στο τέλος, ώστε να ΦΑΙΝΕΤΑΙ στο εξαγόμενο/τυπωμένο
+    // PDF αντί να λείπει εντελώς.
+    if (overlayBytes != null && overlayBytes.isNotEmpty) {
+      final overlayImage = pw.MemoryImage(overlayBytes);
+      doc.addPage(
+        pw.Page(
+          theme: theme,
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.fromLTRB(24, 32, 24, 32),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                tr('Σχέδιο (πάνω από τη σημείωση)', 'Drawing (over the note)'),
+                style: pw.TextStyle(fontSize: fontSize * 1.2, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Expanded(child: pw.Center(child: pw.Image(overlayImage, fit: pw.BoxFit.contain))),
+            ],
+          ),
+        ),
+      );
+    }
     return doc.save();
+  }
+
+  /// Μικρό, τοπικό el/en helper — αυτό το αρχείο δεν έχει BuildContext
+  /// (τρέχει σε background isolate-friendly κώδικα), οπότε δεν μπορεί να
+  /// χρησιμοποιήσει το core/i18n.dart `tr(context, ...)`. Χρησιμοποιεί την
+  /// τρέχουσα system locale του Flutter engine.
+  static String tr(String el, String en) {
+    final code = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    return code == 'el' ? el : en;
   }
 }
 

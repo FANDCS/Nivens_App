@@ -48,10 +48,17 @@ class OrgInfoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(tr(context,
-              el: 'Ο οργανισμός/ομάδα πίσω από την ανάπτυξη και τον σχεδιασμό αυτής '
-                  'της εφαρμογής και της υπόλοιπης σουίτας εφαρμογών.',
-              en: 'The organization/team behind the development and design of this '
-                  'app and the rest of the app suite.')),
+              el: 'Η FANDCS είναι μια ανεξάρτητη, open-source ομάδα ανάπτυξης που '
+                  'δημιουργεί ψηφιακές εμπειρίες από το 2022. Φτιάχνουμε 100% δωρεάν '
+                  'εφαρμογές και ιστότοπους με αυστηρή φιλοσοφία privacy-first: καμία '
+                  'συλλογή δεδομένων, κανένα tracker, καμία διαφήμιση. Η αποστολή μας '
+                  'είναι να κρατήσουμε τον ψηφιακό κόσμο ανοιχτό, διαφανή και '
+                  'προσβάσιμο σε όλους.',
+              en: 'FANDCS is an independent, open-source development team crafting '
+                  'digital experiences since 2022. We build 100% free apps and '
+                  'websites with a strict privacy-first approach: no data collection, '
+                  'no trackers, and no advertisements. Our mission is to keep the '
+                  'digital world open, transparent, and accessible to everyone.')),
           const SizedBox(height: 16),
 
           Material(

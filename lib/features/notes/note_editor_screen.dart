@@ -12,10 +12,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
 import 'package:printing/printing.dart';
+import 'markdown_highlight_controller.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import '../../core/dev_mode.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/storage/app_database.dart';
 import '../../core/storage/nivens_folder.dart';
+import '../../core/text_encoding.dart';
 import '../categories/category_picker.dart';
 import '../clipart/clip_art_picker.dart';
 import '../drawing/drawing_screen.dart';
@@ -47,6 +50,16 @@ class NoteEditorScreen extends StatefulWidget {
   final String? initialContent;
   final String? initialTitle;
 
+  /// Path ενός εξωτερικού αρχείου (ανοίχτηκε μέσω "Άνοιγμα με..."/Share),
+  /// όταν είναι σε text-like format (md/txt/fnotes/κ.λπ.) — αν είναι μη-null,
+  /// η "Αποθήκευση" ξαναγράφει ΚΑΙ σε αυτό το path, όχι μόνο στη βάση.
+  final String? originFilePath;
+
+  /// Η κωδικοποίηση με την οποία διαβάστηκε το [originFilePath] — και με
+  /// την οποία θα ξαναγραφεί, εκτός αν ο χρήστης την αλλάξει από το μενού
+  /// "Αλλαγή κωδικοποίησης αρχείου".
+  final TextEncoding? originEncoding;
+
   const NoteEditorScreen({
     super.key,
     required this.database,
@@ -54,6 +67,8 @@ class NoteEditorScreen extends StatefulWidget {
     this.existingNoteId,
     this.initialContent,
     this.initialTitle,
+    this.originFilePath,
+    this.originEncoding,
   });
 
   @override
@@ -62,12 +77,30 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _titleController = TextEditingController();
-  final _bodyController = TextEditingController();
+  final _bodyController = MarkdownHighlightController();
   final _bodyFocusNode = FocusNode();
   NoteDocument? _note;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isExporting = false;
+
+  /// Ξεχωριστό από το "Preview mode" (_previewMode): ελέγχει ΜΟΝΟ πώς
+  /// αποδίδεται το edit mode — raw markdown (Λειτουργία προγραμματιστή
+  /// ενεργή) ή "σαν κλασικό note app" (μορφοποίηση χωρίς εμφανή σύμβολα).
+  void _onDevModeChanged() {
+    if (!mounted) return;
+    setState(() => _bodyController.highlightEnabled = !DevMode.enabled.value);
+  }
+
+  /// true αν υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί ακόμα — μπαίνει
+  /// true σε κάθε επεξεργασία (τίτλος/σώμα/ζωγραφιά) και ξαναγίνεται false
+  /// μετά από επιτυχημένη αποθήκευση.
+  bool _dirty = false;
+
+  /// Τρέχουσα κωδικοποίηση για save-back στο [NoteEditorScreen.originFilePath]
+  /// — ξεκινάει από αυτή που ανιχνεύθηκε στο άνοιγμα, αλλάζει μόνο μέσω
+  /// "Αλλαγή κωδικοποίησης αρχείου" στο μενού.
+  TextEncoding? _originEncoding;
 
   /// false = edit (raw markdown), true = preview (rendered)
   bool _previewMode = false;
@@ -98,8 +131,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void initState() {
     super.initState();
+    _bodyController.highlightEnabled = !DevMode.enabled.value;
+    _originEncoding = widget.originEncoding;
+    DevMode.enabled.addListener(_onDevModeChanged);
     _load();
     _bodyController.addListener(_recordHistory);
+    _bodyController.addListener(_markDirty);
+    _titleController.addListener(_markDirty);
+  }
+
+  void _markDirty() {
+    if (_isLoading || _dirty) return;
+    _dirty = true;
   }
 
   void _recordHistory() {
@@ -186,7 +229,84 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         isSynced: const Value(false),
       ),
     );
+    if (widget.originFilePath != null) {
+      await _saveToOriginFile(showFeedback: false);
+    }
+    _dirty = false;
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Ξαναγράφει το ΤΡΕΧΟΝ σώμα της σημείωσης στο εξωτερικό αρχείο από το
+  /// οποίο ανοίχτηκε (βλ. [NoteEditorScreen.originFilePath]) — απλό
+  /// κείμενο, με την κωδικοποίηση [_originEncoding] (ή UTF-8 αν λείπει).
+  /// ΔΕΝ γράφει το YAML front-matter — το εξωτερικό αρχείο παραμένει στη
+  /// δική του, αρχική του μορφή (π.χ. ένα .txt μένει καθαρό κείμενο).
+  Future<void> _saveToOriginFile({bool showFeedback = true}) async {
+    final path = widget.originFilePath;
+    if (path == null) return;
+    try {
+      final bytes = TextCodecs.encode(_bodyController.text, _originEncoding ?? TextEncoding.utf8Enc);
+      await File(path).writeAsBytes(bytes);
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${tr(context, el: 'Αποθηκεύτηκε στο αρχείο', en: 'Saved to file')}: $path')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${tr(context, el: 'Αποτυχία αποθήκευσης στο αρχείο', en: 'Failed to save to file')}: $e')),
+        );
+      }
+    }
+  }
+
+  /// Μενού "Αλλαγή κωδικοποίησης αρχείου" — μόνο για σημειώσεις που
+  /// ανοίχτηκαν από εξωτερικό text-like αρχείο. Αλλάζει την κωδικοποίηση
+  /// που θα χρησιμοποιηθεί στα ΕΠΟΜΕΝΑ saves σε αυτό το αρχείο, και
+  /// ξαναγράφει αμέσως το αρχείο με τη νέα κωδικοποίηση.
+  Future<void> _changeOriginFileEncoding() async {
+    final chosen = await showDialog<TextEncoding>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(tr(context, el: 'Κωδικοποίηση αρχείου', en: 'File encoding')),
+        children: [
+          for (final enc in TextEncoding.all)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(enc),
+              child: Row(children: [
+                if (enc == _originEncoding) const Icon(Icons.check, size: 18) else const SizedBox(width: 18),
+                const SizedBox(width: 8),
+                Text(enc.label),
+              ]),
+            ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    setState(() => _originEncoding = chosen);
+    await _saveToOriginFile();
+  }
+
+  /// Καλείται πριν από ΚΑΘΕ προσπάθεια εξόδου (κουμπί "πίσω" του AppBar,
+  /// χειρονομία/κουμπί "πίσω" του συστήματος). Αν δεν υπάρχουν μη
+  /// αποθηκευμένες αλλαγές, βγαίνει αμέσως χωρίς να ρωτήσει.
+  Future<bool> _confirmDiscard() async {
+    if (!_dirty) return true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(context, el: 'Μη αποθηκευμένες αλλαγές', en: 'Unsaved changes')),
+        content: Text(tr(context,
+            el: 'Θα χάσεις τις αλλαγές που δεν έχουν αποθηκευτεί. Έξοδος χωρίς αποθήκευση;',
+            en: 'You will lose your unsaved changes. Exit without saving?')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(tr(context, el: 'Άκυρο', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(tr(context, el: 'Έξοδος χωρίς αποθήκευση', en: 'Discard'))),
+        ],
+      ),
+    );
+    return discard ?? false;
   }
 
   Future<void> _delete() async {
@@ -350,7 +470,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (result == null || !mounted) return;
     final widthPercent = await _pickImageWidthPercent();
     if (widthPercent == null || !mounted) return;
-    final dir = await NivensFolder.sub('drawings');
+    final dir = await NivensFolder.subHidden('drawings');
     final ts = DateTime.now().millisecondsSinceEpoch;
     final imgFile = File(p.join(dir.path, 'drawing_$ts.png'));
     await imgFile.writeAsBytes(result.pngBytes);
@@ -397,7 +517,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ),
     );
     if (result == null || !mounted) return;
-    final dir = await NivensFolder.sub('drawings');
+    final dir = await NivensFolder.subHidden('drawings');
     final ts = DateTime.now().millisecondsSinceEpoch;
     final imgFile = File(p.join(dir.path, 'overlay_${_note!.id}_$ts.png'));
     await imgFile.writeAsBytes(result.pngBytes);
@@ -683,6 +803,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         final bytes = await PdfExportService.buildNotePdf(
           title: _titleController.text.trim(),
           body: _bodyController.text,
+          // Η ζωγραφιά (overlay) δεν είναι μέρος του markdown, οπότε δεν
+          // "φαινόταν" ποτέ σε παλιότερη έκδοση του exporter — μπαίνει τώρα
+          // σε ξεχωριστή σελίδα στο τέλος, δες PdfExportService.
+          overlayBytes: (_overlayBytes != null && _overlayVisible) ? _overlayBytes : null,
         );
         if (choice.format == ExportFormat.print) {
           await Printing.layoutPdf(onLayout: (_) async => bytes, name: safeTitle);
@@ -698,7 +822,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         }
         return;
       }
-      final content = choice.format == ExportFormat.json ? _noteAsJson() : _note!.toMarkdownFile();
+      final content = switch (choice.format) {
+        ExportFormat.json => _noteAsJson(),
+        ExportFormat.plainMarkdown => _bodyController.text,
+        _ => _note!.toMarkdownFile(),
+      };
       if (choice.format == ExportFormat.qr) {
         if (mounted) showQrExportDialog(context: context, data: content);
         return;
@@ -708,8 +836,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         return;
       }
       // Το native format της εφαρμογής (YAML front-matter + markdown σώμα)
-      // εξάγεται πλέον ως .fnotes αντί για .md.
-      final ext = choice.format == ExportFormat.json ? 'json' : 'fnotes';
+      // εξάγεται πλέον ως .fnotes αντί για .md. Το .md (plainMarkdown) είναι
+      // ΞΕΧΩΡΙΣΤΗ επιλογή — καθαρό σώμα, χωρίς front-matter.
+      final ext = switch (choice.format) {
+        ExportFormat.json => 'json',
+        ExportFormat.plainMarkdown => 'md',
+        _ => 'fnotes',
+      };
       if (!choice.encrypted) {
         final path = await ExportService().exportPlainFile(content: content, filename: '$safeTitle.$ext');
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
@@ -792,7 +925,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   void dispose() {
+    DevMode.enabled.removeListener(_onDevModeChanged);
     _bodyController.removeListener(_recordHistory);
+    _bodyController.removeListener(_markDirty);
+    _titleController.removeListener(_markDirty);
     _titleController.dispose();
     _bodyController.dispose();
     _bodyFocusNode.dispose();
@@ -813,7 +949,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: _confirmDiscard,
+      child: Scaffold(
       // ── AppBar ────────────────────────────────────────────────────────
       // ΣΚΟΠΙΜΑ ελάχιστα κουμπιά εδώ (πάντα χωράνε, σε κάθε μέγεθος
       // οθόνης). Οτιδήποτε δεν χρειάζεται να είναι ΠΑΝΤΑ ορατό (εισαγωγή,
@@ -844,7 +982,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           IconButton(
             icon: _isSaving
                 ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.check),
+                : const Icon(Icons.save_outlined),
             tooltip: tr(context, el: 'Αποθήκευση', en: 'Save'),
             onPressed: _isSaving ? null : _save,
           ),
@@ -855,6 +993,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 case 'import': _importFile(); break;
                 case 'import_qr': _importViaQr(); break;
                 case 'export': _exportThisNote(); break;
+                case 'change_encoding': _changeOriginFileEncoding(); break;
                 case 'delete': _delete(); break;
               }
             },
@@ -886,6 +1025,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
+              if (widget.originFilePath != null)
+                PopupMenuItem(
+                  value: 'change_encoding',
+                  child: ListTile(
+                    leading: const Icon(Icons.translate_outlined),
+                    title: Text(tr(context, el: 'Αλλαγή κωδικοποίησης αρχείου', en: 'Change file encoding')),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               if (widget.existingNoteId != null)
                 PopupMenuItem(
                   value: 'delete',
@@ -1036,6 +1184,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             child: _previewMode ? _buildPreview() : _buildEditor(),
           ),
         ],
+      ),
       ),
     );
   }

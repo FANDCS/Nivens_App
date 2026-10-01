@@ -4,14 +4,31 @@ import '../../core/i18n.dart';
 
 /// Αποτέλεσμα επιλογής μορφής εξαγωγής.
 class ExportChoice {
-  final ExportFormat format; // json | markdown | qr — το ΠΕΡΙΕΧΟΜΕΝΟ
+  final ExportFormat format;
   final bool encrypted; // true = μέσα σε κρυπτογραφημένο .notesbackup zip
   const ExportChoice({required this.format, required this.encrypted});
 }
 
-/// Πρώτο βήμα: Nivens (.fnotes) / JSON / PDF / Εκτύπωση / QR (απλά, χωρίς
-/// κωδικό) ή ZIP (κρυπτογραφημένο, θα ρωτήσει μετά για κωδικό + εσωτερική
-/// μορφή — μόνο .fnotes/JSON, το PDF/εκτύπωση δεν έχουν νόημα μέσα σε zip).
+/// Καθολικό wrapper για τα bottom sheets αυτού του αρχείου: scrollable +
+/// με όριο ύψους, ώστε σε μικρές οθόνες (ή με πολλές επιλογές) ο χρήστης
+/// να μπορεί ΠΑΝΤΑ να δει/scroll-άρει ως το τελευταίο στοιχείο, αντί η
+/// λίστα να κόβεται εκτός οθόνης.
+Widget _scrollableSheet(BuildContext context, Widget child) {
+  return SafeArea(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// Πρώτο βήμα: Nivens (.fnotes) / Markdown (.md) / JSON / PDF / Εκτύπωση /
+/// QR (απλά, χωρίς κωδικό) ή ZIP (κρυπτογραφημένο, θα ρωτήσει μετά για
+/// κωδικό + εσωτερική μορφή — μόνο .fnotes/JSON, το PDF/εκτύπωση δεν
+/// έχουν νόημα μέσα σε zip).
 Future<ExportChoice?> showExportFormatMenu({
   required BuildContext context,
   bool allowQr = true,
@@ -19,8 +36,10 @@ Future<ExportChoice?> showExportFormatMenu({
 }) async {
   final firstChoice = await showModalBottomSheet<String>(
     context: context,
-    builder: (context) => SafeArea(
-      child: Column(
+    isScrollControlled: true,
+    builder: (context) => _scrollableSheet(
+      context,
+      Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
@@ -34,8 +53,14 @@ Future<ExportChoice?> showExportFormatMenu({
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Nivens (.fnotes)'),
-            subtitle: Text(tr(context, el: 'Το φυσικό format της εφαρμογής, χωρίς κωδικό', en: "The app's native format, no password")),
+            subtitle: Text(tr(context, el: "Το φυσικό format της εφαρμογής, χωρίς κωδικό", en: "The app's native format, no password")),
             onTap: () => Navigator.of(context).pop('markdown'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.article_outlined),
+            title: const Text('Markdown (.md)'),
+            subtitle: Text(tr(context, el: 'Απλό κείμενο markdown, χωρίς μεταδεδομένα — για άλλες εφαρμογές', en: 'Plain markdown text, no metadata — for other apps')),
+            onTap: () => Navigator.of(context).pop('md'),
           ),
           ListTile(
             leading: const Icon(Icons.data_object_outlined),
@@ -84,6 +109,7 @@ Future<ExportChoice?> showExportFormatMenu({
   if (firstChoice == null) return null;
 
   if (firstChoice == 'markdown') return const ExportChoice(format: ExportFormat.markdown, encrypted: false);
+  if (firstChoice == 'md') return const ExportChoice(format: ExportFormat.plainMarkdown, encrypted: false);
   if (firstChoice == 'json') return const ExportChoice(format: ExportFormat.json, encrypted: false);
   if (firstChoice == 'qr') return const ExportChoice(format: ExportFormat.qr, encrypted: false);
   if (firstChoice == 'termbin') return const ExportChoice(format: ExportFormat.termbin, encrypted: false);
@@ -94,8 +120,10 @@ Future<ExportChoice?> showExportFormatMenu({
   if (!context.mounted) return null;
   final innerFormat = await showModalBottomSheet<String>(
     context: context,
-    builder: (context) => SafeArea(
-      child: Column(
+    isScrollControlled: true,
+    builder: (context) => _scrollableSheet(
+      context,
+      Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(

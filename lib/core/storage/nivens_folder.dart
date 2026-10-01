@@ -51,6 +51,28 @@ class NivensFolder {
     return dir;
   }
 
+  /// Σαν το [sub], αλλά ΕΠΙΠΛΕΟΝ αφήνει ένα κενό αρχείο `.nomedia` μέσα
+  /// στον φάκελο — έτσι το Android MediaStore (και άρα η εφαρμογή
+  /// Φωτογραφίες/Συλλογή) το ΑΓΝΟΕΙ εντελώς, χωρίς να χρειάζεται να
+  /// μετακινήσουμε τα αρχεία σε πλήρως ιδιωτικό (app-private) χώρο —
+  /// παραμένουν στο ίδιο εμφανές, "emulated" storage, απλά δεν εμφανίζονται
+  /// σαν φωτογραφίες. Χρησιμοποιείται για το "drawings" (οι ζωγραφιές
+  /// overlay), ΟΧΙ για "images"/"exports" που ο χρήστης μπορεί να θέλει να
+  /// βλέπει στη Συλλογή.
+  static Future<Directory> subHidden(String name) async {
+    final dir = await sub(name);
+    final marker = File(p.join(dir.path, '.nomedia'));
+    if (!await marker.exists()) {
+      try {
+        await marker.writeAsBytes(const []);
+      } catch (_) {
+        // Best effort — αν αποτύχει (π.χ. σε desktop όπου δεν έχει καν
+        // νόημα το .nomedia), συνεχίζουμε κανονικά.
+      }
+    }
+    return dir;
+  }
+
   static Future<void> _ensureAndroidPermission() async {
     try {
       if (await Permission.manageExternalStorage.isGranted) return;
