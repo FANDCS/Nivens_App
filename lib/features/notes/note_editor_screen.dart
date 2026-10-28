@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
 import 'package:printing/printing.dart';
+import 'live_preview_controller.dart';
 import 'markdown_highlight_controller.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../core/dev_mode.dart';
@@ -79,7 +80,7 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _titleController = TextEditingController();
-  final _bodyController = MarkdownHighlightController();
+  final _bodyController = LivePreviewController();
   final _bodyFocusNode = FocusNode();
   NoteDocument? _note;
   bool _isLoading = true;
@@ -87,11 +88,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _isExporting = false;
 
   /// Ξεχωριστό από το "Preview mode" (_previewMode): ελέγχει ΜΟΝΟ πώς
-  /// αποδίδεται το edit mode — raw markdown (Λειτουργία προγραμματιστή
-  /// ενεργή) ή "σαν κλασικό note app" (μορφοποίηση χωρίς εμφανή σύμβολα).
+  /// αποδίδεται το edit mode:
+  ///  * Λειτουργία προγραμματιστή ΕΝΕΡΓΗ  → ελαφριά μορφοποίηση με τα
+  ///    σύμβολα markdown ορατά (η παλιά όψη «με ανενεργή λειτουργία»).
+  ///  * Λειτουργία προγραμματιστή ΑΝΕΝΕΡΓΗ → «σαν Προβολή»: αποδοσμένη
+  ///    μορφοποίηση με κρυμμένα σύμβολα (βλ. LivePreviewController).
+  void _applyDevModeToEditor() {
+    _bodyController.highlightEnabled = true; // η ελαφριά μορφοποίηση μένει πάντα
+    _bodyController.renderedMode = !DevMode.enabled.value;
+  }
+
   void _onDevModeChanged() {
     if (!mounted) return;
-    setState(() => _bodyController.highlightEnabled = !DevMode.enabled.value);
+    setState(_applyDevModeToEditor);
   }
 
   /// true αν υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί ακόμα — μπαίνει
@@ -138,7 +147,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _bodyController.highlightEnabled = !DevMode.enabled.value;
+    _applyDevModeToEditor();
     _originEncoding = widget.originEncoding;
     DevMode.enabled.addListener(_onDevModeChanged);
     _load();
@@ -319,7 +328,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (ok != true || !mounted) return;
     await (widget.database.update(widget.database.notes)
           ..where((n) => n.id.equals(_note!.id)))
-        .write(const NotesCompanion(isDeleted: Value(true)));
+        .write(NotesCompanion(
+          isDeleted: const Value(true),
+          // Το updatedAt λειτουργεί ως «ώρα διαγραφής» για τον κάδο (αυτόματη
+          // οριστική διαγραφή μετά από 35 μέρες) — δεν χρειάζεται νέα στήλη.
+          updatedAt: Value(DateTime.now().toUtc()),
+          isSynced: const Value(false),
+        ));
     if (mounted) Navigator.of(context).pop();
   }
 
