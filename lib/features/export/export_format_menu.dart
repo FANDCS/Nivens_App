@@ -6,7 +6,12 @@ import '../../core/i18n.dart';
 class ExportChoice {
   final ExportFormat format;
   final bool encrypted; // true = μέσα σε κρυπτογραφημένο .notesbackup zip
-  const ExportChoice({required this.format, required this.encrypted});
+
+  /// Μόνο για PDF/Εκτύπωση (και μόνο όταν το μενού άνοιξε με
+  /// `singleNote: true`): η όψη που διάλεξε ο χρήστης — Προβολή ή
+  /// Επεξεργασία. null για όλες τις άλλες μορφές.
+  final ExportViewMode? viewMode;
+  const ExportChoice({required this.format, required this.encrypted, this.viewMode});
 }
 
 /// Καθολικό wrapper για τα bottom sheets αυτού του αρχείου: scrollable +
@@ -25,14 +30,66 @@ Widget _scrollableSheet(BuildContext context, Widget child) {
   );
 }
 
+/// Δεύτερο βήμα για PDF / Εκτύπωση: ρωτάει αν θα εξαχθεί η Προβολή (review)
+/// ή η λειτουργία Επεξεργασίας (edit). Το [current] σημειώνει σε ποια
+/// λειτουργία βρίσκεται τώρα ο χρήστης. Επιστρέφει null αν ακυρώσει.
+Future<ExportViewMode?> _askViewMode(BuildContext context, ExportViewMode? current) {
+  return showModalBottomSheet<ExportViewMode>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => _scrollableSheet(
+      context,
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(tr(context, el: 'Περιεχόμενο εξαγωγής', en: 'Export content'),
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.visibility_outlined),
+            title: Text(tr(context, el: 'Προβολή (review)', en: 'Review (preview mode)')),
+            subtitle: Text(tr(context,
+                el: 'Αποδοσμένη σημείωση, όπως στην Προβολή',
+                en: 'Rendered note, as in Preview')),
+            trailing: current == ExportViewMode.review ? const Icon(Icons.check_circle_outline) : null,
+            onTap: () => Navigator.of(context).pop(ExportViewMode.review),
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: Text(tr(context, el: 'Επεξεργασία (edit mode)', en: 'Edit mode')),
+            subtitle: Text(tr(context,
+                el: 'Κείμενο markdown με σύμβολα, όπως στον editor',
+                en: 'Markdown text with symbols, as in the editor')),
+            trailing: current == ExportViewMode.edit ? const Icon(Icons.check_circle_outline) : null,
+            onTap: () => Navigator.of(context).pop(ExportViewMode.edit),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Πρώτο βήμα: Nivens (.fnotes) / Markdown (.md) / JSON / PDF / Εκτύπωση /
 /// QR (απλά, χωρίς κωδικό) ή ZIP (κρυπτογραφημένο, θα ρωτήσει μετά για
 /// κωδικό + εσωτερική μορφή — μόνο .fnotes/JSON, το PDF/εκτύπωση δεν
 /// έχουν νόημα μέσα σε zip).
+///
+/// Με `singleNote: true` (μόνο από τον editor μιας σημείωσης) εμφανίζονται
+/// ΕΠΙΠΛΕΟΝ «Αντιγραφή στο πρόχειρο» και «Εικόνα/ες», και το PDF/Εκτύπωση
+/// ρωτούν αν θα εξαχθεί η Προβολή (review) ή η Επεξεργασία (edit) — το
+/// [currentViewMode] δείχνει σε ποια λειτουργία είναι ο χρήστης αυτή τη
+/// στιγμή. Οι μαζικές εξαγωγές («όλες οι σημειώσεις») δεν τα χρησιμοποιούν.
 Future<ExportChoice?> showExportFormatMenu({
   required BuildContext context,
   bool allowQr = true,
   bool allowTermbin = true,
+  bool singleNote = false,
+  ExportViewMode? currentViewMode,
 }) async {
   final firstChoice = await showModalBottomSheet<String>(
     context: context,
@@ -77,9 +134,27 @@ Future<ExportChoice?> showExportFormatMenu({
           ListTile(
             leading: const Icon(Icons.print_outlined),
             title: Text(tr(context, el: 'Εκτύπωση', en: 'Print')),
-            subtitle: Text(tr(context, el: 'Ανοίγει τον διάλογο εκτύπωσης (ή αποθήκευση ως PDF)', en: 'Opens the print dialog (or save as PDF)')),
+            subtitle: Text(tr(context, el: 'Διάλογος εκτύπωσης (ή αποθήκευση ως PDF)', en: 'Print dialog (or save as PDF)')),
             onTap: () => Navigator.of(context).pop('print'),
           ),
+          if (singleNote) ...[
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: Text(tr(context, el: 'Εικόνα/ες (PNG)', en: 'Image(s) (PNG)')),
+              subtitle: Text(tr(context,
+                  el: 'Στιγμιότυπο της τρέχουσας λειτουργίας (Προβολή ή Επεξεργασία)',
+                  en: 'Screenshot of the current mode (Preview or Edit)')),
+              onTap: () => Navigator.of(context).pop('image'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_copy_outlined),
+              title: Text(tr(context, el: 'Αντιγραφή στο πρόχειρο', en: 'Copy to clipboard')),
+              subtitle: Text(tr(context,
+                  el: 'Κείμενο markdown, όπως στην Επεξεργασία',
+                  en: 'Markdown text, as in Edit mode')),
+              onTap: () => Navigator.of(context).pop('clipboard'),
+            ),
+          ],
           if (allowQr)
             ListTile(
               leading: const Icon(Icons.qr_code_2_outlined),
@@ -98,7 +173,7 @@ Future<ExportChoice?> showExportFormatMenu({
           ListTile(
             leading: const Icon(Icons.folder_zip_outlined),
             title: Text(tr(context, el: 'ZIP με κωδικό', en: 'ZIP with password')),
-            subtitle: Text(tr(context, el: 'Κρυπτογραφημένο — θα σου ζητήσει κωδικό + μορφή', en: 'Encrypted — will ask for password + format')),
+            subtitle: Text(tr(context, el: 'Κρυπτογραφημένο — με κωδικό και επιλογή μορφής', en: 'Encrypted — with password and format choice')),
             onTap: () => Navigator.of(context).pop('zip'),
           ),
         ],
@@ -113,8 +188,17 @@ Future<ExportChoice?> showExportFormatMenu({
   if (firstChoice == 'json') return const ExportChoice(format: ExportFormat.json, encrypted: false);
   if (firstChoice == 'qr') return const ExportChoice(format: ExportFormat.qr, encrypted: false);
   if (firstChoice == 'termbin') return const ExportChoice(format: ExportFormat.termbin, encrypted: false);
-  if (firstChoice == 'pdf') return const ExportChoice(format: ExportFormat.pdf, encrypted: false);
-  if (firstChoice == 'print') return const ExportChoice(format: ExportFormat.print, encrypted: false);
+  if (firstChoice == 'image') return const ExportChoice(format: ExportFormat.image, encrypted: false);
+  if (firstChoice == 'clipboard') return const ExportChoice(format: ExportFormat.clipboard, encrypted: false);
+  if (firstChoice == 'pdf' || firstChoice == 'print') {
+    final format = firstChoice == 'pdf' ? ExportFormat.pdf : ExportFormat.print;
+    if (!singleNote) return ExportChoice(format: format, encrypted: false);
+    // PDF / Εκτύπωση μιας σημείωσης: ρώτα review ή edit.
+    if (!context.mounted) return null;
+    final mode = await _askViewMode(context, currentViewMode);
+    if (mode == null) return null;
+    return ExportChoice(format: format, encrypted: false, viewMode: mode);
+  }
 
   // firstChoice == 'zip' -> ρώτα ΕΠΙΠΛΕΟΝ ποια μορφή θα μπει μέσα στο zip
   if (!context.mounted) return null;

@@ -11,7 +11,17 @@ import '../../core/storage/nivens_folder.dart';
 /// αποθηκεύεται πλέον με επέκταση **.fnotes** (πριν ήταν .md).
 /// `plainMarkdown` = ΜΟΝΟ το σώμα σε καθαρό .md, ΧΩΡΙΣ front-matter — για
 /// εισαγωγή σε άλλες εφαρμογές markdown.
-enum ExportFormat { markdown, plainMarkdown, json, qr, termbin, pdf, print }
+///
+/// `clipboard` = αντιγραφή του κειμένου της σημείωσης (όπως είναι στη
+/// λειτουργία επεξεργασίας) στο πρόχειρο· `image` = εξαγωγή ως εικόνα/ες PNG
+/// (στιγμιότυπο της τρέχουσας λειτουργίας: Προβολή ή Επεξεργασία).
+enum ExportFormat { markdown, plainMarkdown, json, qr, termbin, pdf, print, clipboard, image }
+
+/// Ποια «όψη» της σημείωσης εξάγεται σε PDF / Εκτύπωση:
+/// `review` = όπως φαίνεται στην Προβολή (αποδοσμένο markdown),
+/// `edit` = όπως φαίνεται στη λειτουργία επεξεργασίας (το κείμενο markdown
+/// με τα σύμβολά του).
+enum ExportViewMode { review, edit }
 
 /// Δημιουργεί encrypted export αρχεία (.notesbackup): zip στη μνήμη +
 /// AES-256-GCM encryption ολόκληρου του zip με κλειδί που παράγεται

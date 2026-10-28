@@ -23,6 +23,8 @@ import '../categories/category_picker.dart';
 import '../clipart/clip_art_picker.dart';
 import '../drawing/drawing_screen.dart';
 import '../export/export_service.dart';
+import '../export/image_export_service.dart';
+import '../export/encoding_picker.dart';
 import '../export/export_password_dialog.dart';
 import '../export/export_format_menu.dart';
 import '../export/pdf_export_service.dart';
@@ -108,6 +110,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   // ── Ζουμ στην Προβολή (preview mode) ────────────────────────────────────
   final TransformationController _zoomController = TransformationController();
   final GlobalKey _previewRepaintKey = GlobalKey();
+
+  /// Περιοχή περιεχομένου (editor ή Προβολή) — μετράμε το πλάτος της για να
+  /// βγει η εξαγωγή εικόνας της λειτουργίας επεξεργασίας με το ίδιο πλάτος
+  /// κειμένου που βλέπει ο χρήστης στην οθόνη.
+  final GlobalKey _contentAreaKey = GlobalKey();
   bool _isFlatteningDrawing = false;
   double _zoomLevel = 1.0;
 
@@ -266,22 +273,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// που θα χρησιμοποιηθεί στα ΕΠΟΜΕΝΑ saves σε αυτό το αρχείο, και
   /// ξαναγράφει αμέσως το αρχείο με τη νέα κωδικοποίηση.
   Future<void> _changeOriginFileEncoding() async {
-    final chosen = await showDialog<TextEncoding>(
+    final chosen = await showEncodingPicker(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: Text(tr(context, el: 'Κωδικοποίηση αρχείου', en: 'File encoding')),
-        children: [
-          for (final enc in TextEncoding.all)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(ctx).pop(enc),
-              child: Row(children: [
-                if (enc == _originEncoding) const Icon(Icons.check, size: 18) else const SizedBox(width: 18),
-                const SizedBox(width: 8),
-                Text(enc.label),
-              ]),
-            ),
-        ],
-      ),
+      title: tr(context, el: 'Κωδικοποίηση αρχείου', en: 'File encoding'),
+      current: _originEncoding,
     );
     if (chosen == null) return;
     setState(() => _originEncoding = chosen);
@@ -794,18 +789,45 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   // ── EXPORT ─────────────────────────────────────────────────────────────────
 
   Future<void> _exportThisNote() async {
-    final choice = await showExportFormatMenu(context: context);
+    final choice = await showExportFormatMenu(
+      context: context,
+      singleNote: true,
+      currentViewMode: _previewMode ? ExportViewMode.review : ExportViewMode.edit,
+    );
     if (choice == null || !mounted) return;
     setState(() => _isExporting = true);
     try {
       final safeTitle = (_note!.title.isEmpty ? 'note' : _note!.title).replaceAll(RegExp(r'[^\w\-]+'), '_');
+      if (choice.format == ExportFormat.clipboard) {
+        // «Edit mode» στο πρόχειρο: το κείμενο ακριβώς όπως είναι στον editor.
+        final text = _bodyController.text;
+        await Clipboard.setData(ClipboardData(text: text));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(text.isEmpty
+                ? tr(context, el: 'Η σημείωση είναι κενή — αντιγράφηκε κενό κείμενο', en: 'The note is empty — copied empty text')
+                : tr(context,
+                    el: 'Αντιγράφηκε στο πρόχειρο (${text.length} χαρακτήρες)',
+                    en: 'Copied to clipboard (${text.length} characters)')),
+          ));
+        }
+        return;
+      }
+      if (choice.format == ExportFormat.image) {
+        await _exportAsImages(safeTitle);
+        return;
+      }
       if (choice.format == ExportFormat.pdf || choice.format == ExportFormat.print) {
         final bytes = await PdfExportService.buildNotePdf(
           title: _titleController.text.trim(),
           body: _bodyController.text,
+          // Review = όπως στην Προβολή, Edit = όπως στον editor (ρωτήθηκε
+          // από το μενού εξαγωγής). Default: review.
+          mode: choice.viewMode ?? ExportViewMode.review,
+          editHighlight: _bodyController.highlightEnabled,
           // Η ζωγραφιά (overlay) δεν είναι μέρος του markdown, οπότε δεν
           // "φαινόταν" ποτέ σε παλιότερη έκδοση του exporter — μπαίνει τώρα
-          // σε ξεχωριστή σελίδα στο τέλος, δες PdfExportService.
+          // σε ξεχωριστή σελίδα στο τέλος (μόνο στο review), δες PdfExportService.
           overlayBytes: (_overlayBytes != null && _overlayVisible) ? _overlayBytes : null,
         );
         if (choice.format == ExportFormat.print) {
@@ -813,7 +835,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           return;
         }
         final dir = await NivensFolder.sub('exports');
-        final path = p.join(dir.path, '$safeTitle.pdf');
+        final modeSuffix = choice.viewMode == ExportViewMode.edit ? '_edit' : '';
+        final path = p.join(dir.path, '$safeTitle$modeSuffix.pdf');
         await File(path).writeAsBytes(bytes);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -859,6 +882,65 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, el: 'Εξήχθη', en: 'Exported')}: $path')));
     } finally {
       if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  /// Εξαγωγή ως εικόνα/ες PNG — σαν στιγμιότυπο της ΤΡΕΧΟΥΣΑΣ λειτουργίας:
+  ///  * Προβολή (review): στιγμιότυπο της αποδοσμένης σημείωσης (κείμενο,
+  ///    πολυμέσα και ζωγραφιά αν είναι ορατή), ολόκληρο το μήκος της·
+  ///  * Επεξεργασία (edit): το κείμενο όπως φαίνεται στον editor (με την ίδια
+  ///    γραμματοσειρά/μέγεθος/μορφοποίηση), ολόκληρο, όχι μόνο το ορατό μέρος.
+  /// Αν είναι πολύ μεγάλο, βγαίνουν περισσότερες εικόνες. Αποθηκεύονται στον
+  /// φάκελο Documents/Nivens/exports.
+  Future<void> _exportAsImages(String safeTitle) async {
+    final preview = _previewMode;
+    final messenger = ScaffoldMessenger.of(context);
+    // Η γλώσσα διαβάζεται ΠΡΙΝ από τα await, ώστε να μη χρησιμοποιηθεί το
+    // context αφού ίσως έχει φύγει η οθόνη.
+    final isEn = Localizations.maybeLocaleOf(context)?.languageCode == 'en';
+    String t(String el, String en) => isEn ? en : el;
+    try {
+      if (_bodyController.text.trim().isEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(t('Η σημείωση είναι κενή.', 'The note is empty.'))));
+        return;
+      }
+      final List<Uint8List> pngs;
+      if (preview) {
+        final boundary =
+            _previewRepaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+        if (boundary == null) {
+          throw StateError(t('Η Προβολή δεν είναι έτοιμη — δοκίμασε ξανά.', 'The preview is not ready — try again.'));
+        }
+        // Μικρή αναμονή ώστε να έχει ζωγραφιστεί πλήρως η Προβολή (μετά το
+        // κλείσιμο του μενού εξαγωγής) πριν το στιγμιότυπο.
+        await Future.delayed(const Duration(milliseconds: 50));
+        pngs = await ImageExportService.captureBoundary(boundary);
+      } else {
+        final theme = Theme.of(context);
+        final areaBox = _contentAreaKey.currentContext?.findRenderObject() as RenderBox?;
+        final width = (areaBox != null && areaBox.hasSize) ? areaBox.size.width : MediaQuery.sizeOf(context).width;
+        final style = (theme.textTheme.bodyLarge ?? const TextStyle()).merge(
+          NoteFonts.style(_note!.font, TextStyle(fontSize: _note!.fontSize, height: 1.5)),
+        );
+        pngs = await ImageExportService.renderText(
+          span: _bodyController.buildTextSpan(context: context, style: style, withComposing: false),
+          width: width,
+          background: theme.scaffoldBackgroundColor,
+          textScaler: MediaQuery.textScalerOf(context),
+        );
+      }
+      final paths = await ImageExportService.savePngs(pngs, '${safeTitle}_${preview ? 'review' : 'edit'}');
+      if (!mounted) return;
+      final folder = p.dirname(paths.first);
+      messenger.showSnackBar(SnackBar(
+        content: Text(paths.length == 1
+            ? '${t('Εξήχθη', 'Exported')}: ${paths.first}'
+            : '${t('Εξήχθησαν', 'Exported')} ${paths.length} ${t('εικόνες', 'images')}: $folder'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('${t('Αποτυχία εξαγωγής εικόνας', 'Image export failed')}: $e'),
+      ));
     }
   }
 
@@ -1181,7 +1263,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
           // ── Περιεχόμενο ────────────────────────────────────────────────
           Expanded(
-            child: _previewMode ? _buildPreview() : _buildEditor(),
+            child: KeyedSubtree(
+              key: _contentAreaKey,
+              child: _previewMode ? _buildPreview() : _buildEditor(),
+            ),
           ),
         ],
       ),

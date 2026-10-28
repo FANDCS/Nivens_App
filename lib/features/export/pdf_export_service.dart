@@ -5,9 +5,17 @@ import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'export_service.dart' show ExportViewMode;
+
 /// Μετατρέπει μια σημείωση (τίτλος + markdown σώμα) σε PDF, για τις
 /// επιλογές "Εξαγωγή ως PDF" και "Εκτύπωση" (η εκτύπωση φτιάχνει το ίδιο
 /// PDF και το περνάει στο σύστημα εκτύπωσης/preview του λειτουργικού).
+///
+/// Δύο όψεις ([ExportViewMode]): `review` (προεπιλογή) = αποδοσμένο markdown
+/// όπως στην Προβολή· `edit` = το κείμενο όπως φαίνεται στη λειτουργία
+/// επεξεργασίας, δηλαδή το markdown ΜΕ τα σύμβολά του (#, **, `...`), με
+/// την ίδια ελαφριά μορφοποίηση που έχει ο editor όταν η «Λειτουργία
+/// προγραμματιστή» είναι ανενεργή ([buildNotePdf.editHighlight]).
 ///
 /// Χρησιμοποιεί τα δικά της γραμματοσειρές (NotoSansPdf/NotoSansMonoPdf,
 /// δες pubspec.yaml) αντί για κάποιο google_font της εφαρμογής, ώστε να
@@ -39,6 +47,8 @@ class PdfExportService {
     required String body,
     double fontSize = 11,
     Uint8List? overlayBytes,
+    ExportViewMode mode = ExportViewMode.review,
+    bool editHighlight = true,
   }) async {
     await _ensureFonts();
     final doc = pw.Document();
@@ -48,8 +58,9 @@ class PdfExportService {
       italic: _italic!,
       boldItalic: _boldItalic!,
     );
-    final parser = _MarkdownToPdf(fontSize: fontSize, mono: _mono!);
-    final blocks = parser.parse(body);
+    final blocks = mode == ExportViewMode.edit
+        ? _RawMarkdownToPdf(fontSize: fontSize, mono: _mono!, highlight: editHighlight).parse(body)
+        : _MarkdownToPdf(fontSize: fontSize, mono: _mono!).parse(body);
 
     doc.addPage(
       pw.MultiPage(
@@ -81,7 +92,9 @@ class PdfExportService {
     // στο ήδη paginated κείμενο (διαφορετική μηχανή rendering). Μπαίνει σε
     // δική της σελίδα στο τέλος, ώστε να ΦΑΙΝΕΤΑΙ στο εξαγόμενο/τυπωμένο
     // PDF αντί να λείπει εντελώς.
-    if (overlayBytes != null && overlayBytes.isNotEmpty) {
+    // Στη λειτουργία επεξεργασίας η ζωγραφιά δεν φαίνεται (είναι layer της
+    // Προβολής), άρα δεν μπαίνει ούτε στο PDF της όψης «edit».
+    if (mode == ExportViewMode.review && overlayBytes != null && overlayBytes.isNotEmpty) {
       final overlayImage = pw.MemoryImage(overlayBytes);
       doc.addPage(
         pw.Page(
@@ -308,5 +321,109 @@ class _MarkdownToPdf {
         children: spans,
       ),
     );
+  }
+}
+
+/// Όψη «edit» του PDF: το κείμενο της σημείωσης ΩΣ ΕΧΕΙ (raw markdown, μία
+/// γραμμή ανά γραμμή του editor, με διατήρηση κενών γραμμών/εσοχών), όχι
+/// αποδοσμένο. Με [highlight] = true μιμείται το MarkdownHighlightController
+/// του editor: οι χαρακτήρες-δείκτες (`**`, `*`, `` ` ``, `~~`, `<u>`, `#`)
+/// βγαίνουν μικροί/αχνοί και το κείμενο ανάμεσά τους παίρνει μορφοποίηση
+/// (έντονα/πλάγια/monospace/διαγραμμένα/υπογραμμισμένα/μεγαλύτερος τίτλος).
+/// Με [highlight] = false (Λειτουργία προγραμματιστή) βγαίνει καθαρό κείμενο.
+class _RawMarkdownToPdf {
+  final double fontSize;
+  final pw.Font mono;
+  final bool highlight;
+  _RawMarkdownToPdf({required this.fontSize, required this.mono, required this.highlight});
+
+  // Ίδια regex με το lib/features/notes/markdown_highlight_controller.dart,
+  // ώστε το PDF να δείχνει ό,τι δείχνει και ο editor.
+  static final _headingPattern = RegExp(r'^(#{1,3}\s+)(.*)$');
+  static final _inlinePattern = RegExp(
+    r'(\*\*.+?\*\*)|(~~.+?~~)|(<u>.+?</u>)|(`[^`\n]+?`)|(\*[^\s*].*?\*)',
+  );
+
+  static const _markerColor = PdfColors.grey500;
+  static const _lineGap = 3.0;
+
+  List<pw.Widget> parse(String text) {
+    final lines = text.replaceAll('\r\n', '\n').replaceAll('\t', '    ').split('\n');
+    final widgets = <pw.Widget>[];
+    for (final line in lines) {
+      if (line.isEmpty) {
+        widgets.add(pw.SizedBox(height: fontSize + _lineGap));
+        continue;
+      }
+      widgets.add(pw.RichText(text: _lineSpan(line)));
+    }
+    return widgets;
+  }
+
+  pw.TextStyle get _base => pw.TextStyle(fontSize: fontSize, lineSpacing: _lineGap);
+
+  pw.TextSpan _lineSpan(String line) {
+    if (!highlight) return pw.TextSpan(text: line, style: _base);
+
+    final heading = _headingPattern.firstMatch(line);
+    if (heading != null) {
+      final marker = heading.group(1)!;
+      final level = marker.trim().length;
+      final headingStyle = _base.copyWith(
+        fontWeight: pw.FontWeight.bold,
+        fontSize: fontSize * (level == 1 ? 1.5 : (level == 2 ? 1.32 : 1.18)),
+      );
+      return pw.TextSpan(
+        style: _base,
+        children: [
+          pw.TextSpan(text: marker, style: _markerStyle(headingStyle)),
+          ..._inlineSpans(heading.group(2)!, headingStyle),
+        ],
+      );
+    }
+    return pw.TextSpan(style: _base, children: _inlineSpans(line, _base));
+  }
+
+  pw.TextStyle _markerStyle(pw.TextStyle base) => base.copyWith(
+        color: _markerColor,
+        fontSize: (base.fontSize ?? fontSize) * 0.82,
+        fontWeight: pw.FontWeight.normal,
+      );
+
+  List<pw.InlineSpan> _inlineSpans(String text, pw.TextStyle base) {
+    if (text.isEmpty) return const [];
+    final spans = <pw.InlineSpan>[];
+    var last = 0;
+    for (final m in _inlinePattern.allMatches(text)) {
+      if (m.start > last) spans.add(pw.TextSpan(text: text.substring(last, m.start), style: base));
+      final token = m.group(0)!;
+      if (token.startsWith('**')) {
+        _wrapped(spans, token, 2, 2, base.copyWith(fontWeight: pw.FontWeight.bold), base);
+      } else if (token.startsWith('~~')) {
+        _wrapped(spans, token, 2, 2, base.copyWith(decoration: pw.TextDecoration.lineThrough), base);
+      } else if (token.startsWith('<u>')) {
+        _wrapped(spans, token, 3, 4, base.copyWith(decoration: pw.TextDecoration.underline), base);
+      } else if (token.startsWith('`')) {
+        _wrapped(spans, token, 1, 1, base.copyWith(font: mono), base);
+      } else {
+        _wrapped(spans, token, 1, 1, base.copyWith(fontStyle: pw.FontStyle.italic), base);
+      }
+      last = m.end;
+    }
+    if (last < text.length) spans.add(pw.TextSpan(text: text.substring(last), style: base));
+    return spans;
+  }
+
+  void _wrapped(
+    List<pw.InlineSpan> spans,
+    String token,
+    int openLen,
+    int closeLen,
+    pw.TextStyle innerStyle,
+    pw.TextStyle base,
+  ) {
+    spans.add(pw.TextSpan(text: token.substring(0, openLen), style: _markerStyle(base)));
+    spans.add(pw.TextSpan(text: token.substring(openLen, token.length - closeLen), style: innerStyle));
+    spans.add(pw.TextSpan(text: token.substring(token.length - closeLen), style: _markerStyle(base)));
   }
 }

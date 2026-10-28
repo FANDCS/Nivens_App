@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../../core/i18n.dart';
 import '../../core/storage/nivens_folder.dart';
 import '../../core/text_encoding.dart';
+import 'encoding_picker.dart';
 
 /// Εργαλείο: άλλαξε την κωδικοποίηση ενός αρχείου κειμένου — π.χ. ένα παλιό
 /// .txt/.csv σε Windows-1253 (ελληνικά) που θες σε UTF-8, ή το αντίστροφο
@@ -30,6 +31,9 @@ class _EncodingConverterScreenState extends State<EncodingConverterScreen> {
   bool _saving = false;
   String? _savedPath;
 
+  /// Πόσοι χαρακτήρες δεν χωράνε στην κωδικοποίηση-στόχο (θα γίνουν '?').
+  int _lossy = 0;
+
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.any);
     if (result == null || result.files.isEmpty || result.files.single.path == null) return;
@@ -44,6 +48,22 @@ class _EncodingConverterScreenState extends State<EncodingConverterScreen> {
       _error = null;
       _savedPath = null;
     });
+    _updateLossy();
+  }
+
+  /// Υπολογίζει (ξανά) την προειδοποίηση απώλειας χαρακτήρων — καλείται
+  /// κάθε φορά που αλλάζει η πηγή, ο στόχος ή το αρχείο.
+  void _updateLossy() {
+    final bytes = _bytes;
+    var n = 0;
+    if (bytes != null) {
+      try {
+        n = TextCodecs.countUnencodable(TextCodecs.decode(bytes, _source), _target);
+      } catch (_) {
+        n = 0;
+      }
+    }
+    if (mounted) setState(() => _lossy = n);
   }
 
   String get _preview {
@@ -82,18 +102,28 @@ class _EncodingConverterScreenState extends State<EncodingConverterScreen> {
     }
   }
 
-  Widget _encodingDropdown({
+  /// Πεδίο που ανοίγει τον ομαδοποιημένο διάλογο επιλογής κωδικοποίησης
+  /// (με ~50 κωδικοποιήσεις ένα απλό dropdown δεν είναι βολικό).
+  Widget _encodingField({
     required String label,
     required TextEncoding value,
-    required ValueChanged<TextEncoding?> onChanged,
+    required ValueChanged<TextEncoding> onChanged,
   }) {
-    return DropdownButtonFormField<TextEncoding>(
-      initialValue: value,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-      items: [
-        for (final e in TextEncoding.all) DropdownMenuItem(value: e, child: Text(e.label)),
-      ],
-      onChanged: onChanged,
+    return InkWell(
+      borderRadius: BorderRadius.circular(4),
+      onTap: () async {
+        final chosen = await showEncodingPicker(context: context, title: label, current: value);
+        if (chosen != null) onChanged(chosen);
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        child: Row(
+          children: [
+            Expanded(child: Text(value.label)),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
     );
   }
 
@@ -106,8 +136,8 @@ class _EncodingConverterScreenState extends State<EncodingConverterScreen> {
         children: [
           Text(
             tr(context,
-                el: 'Διάβασε ένα αρχείο κειμένου με μία κωδικοποίηση και αποθήκευσέ το με άλλη — π.χ. ένα παλιό .txt σε Windows-1253 προς UTF-8.',
-                en: 'Read a text file in one encoding and save it in another — e.g. an old Windows-1253 .txt into UTF-8.'),
+                el: 'Ανάγνωση αρχείου κειμένου και αποθήκευση με άλλη κωδικοποίηση — π.χ. παλιό .txt Windows-1253 σε UTF-8.',
+                en: 'Reading a text file and saving it in another encoding — e.g. an old Windows-1253 .txt to UTF-8.'),
             style: const TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 16),
@@ -120,19 +150,43 @@ class _EncodingConverterScreenState extends State<EncodingConverterScreen> {
             const SizedBox(height: 8),
             Text(p.basename(_file!.path), style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
-            _encodingDropdown(
-              label: tr(context, el: 'Πηγή (ανιχνεύθηκε αυτόματα, άλλαξέ την αν το κείμενο φαίνεται λάθος)', en: 'Source (auto-detected — change it if the text below looks wrong)'),
+            _encodingField(
+              label: tr(context, el: 'Πηγή (αυτόματη ανίχνευση — αλλαγή αν το κείμενο φαίνεται λάθος)', en: 'Source (auto-detected — change if the text looks wrong)'),
               value: _source,
-              onChanged: (v) => setState(() => _source = v ?? _source),
+              onChanged: (v) {
+                setState(() => _source = v);
+                _updateLossy();
+              },
             ),
             const SizedBox(height: 12),
-            _encodingDropdown(
+            _encodingField(
               label: tr(context, el: 'Στόχος', en: 'Target'),
               value: _target,
-              onChanged: (v) => setState(() => _target = v ?? _target),
+              onChanged: (v) {
+                setState(() => _target = v);
+                _updateLossy();
+              },
             ),
+            if (_lossy > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 18, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      tr(context,
+                          el: 'Απώλεια χαρακτήρων: $_lossy δεν υπάρχουν στον στόχο και θα γίνουν «?».',
+                          en: 'Character loss: $_lossy not in the target encoding, will become “?”.'),
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
-            Text(tr(context, el: 'Προεπισκόπηση (με την επιλεγμένη πηγή):', en: 'Preview (using the selected source):'),
+            Text(tr(context, el: 'Προεπισκόπηση (με την επιλεγμένη πηγή)', en: 'Preview (with the selected source)'),
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Container(

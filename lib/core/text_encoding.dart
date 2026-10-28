@@ -1,28 +1,122 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'text_encoding_tables.dart';
+
 /// Κωδικοποιήσεις κειμένου που υποστηρίζονται για εισαγωγή/εξαγωγή/μετατροπή
 /// αρχείων. Δεν χρειάζεται εξωτερικό πακέτο: οι πίνακες των μονοψήφιων
-/// (single-byte) κωδικοποιήσεων παρήχθησαν από τα επίσημα mappings
-/// (Windows-1253/1252/1251, ISO-8859-7) και δίνουν τον Unicode χαρακτήρα για
-/// κάθε byte 0x80–0xFF (0xFFFD = απροσδιόριστο byte).
+/// (single-byte) κωδικοποιήσεων είναι είτε εδώ (Windows-1253/1252/1251,
+/// ISO-8859-7) είτε στο text_encoding_tables.dart (όλες οι υπόλοιπες) και
+/// δίνουν τον Unicode χαρακτήρα για κάθε byte 0x80–0xFF (0xFFFD =
+/// απροσδιόριστο byte).
+///
+/// ΔΕΝ υποστηρίζονται (ακόμα) οι πολυψήφιες ανατολικοασιατικές
+/// κωδικοποιήσεις (Shift_JIS, GBK, Big5, EUC-KR κ.λπ.) — χρειάζονται πολύ
+/// μεγάλους πίνακες.
 class TextEncoding {
   final String id;
   final String label;
-  const TextEncoding._(this.id, this.label);
 
-  static const utf8Enc = TextEncoding._('utf8', 'UTF-8');
-  static const utf8Bom = TextEncoding._('utf8bom', 'UTF-8 (BOM)');
-  static const utf16le = TextEncoding._('utf16le', 'UTF-16 LE');
-  static const utf16be = TextEncoding._('utf16be', 'UTF-16 BE');
-  static const cp1253 = TextEncoding._('cp1253', 'Windows-1253 (Greek)');
-  static const iso88597 = TextEncoding._('iso88597', 'ISO-8859-7 (Greek)');
-  static const cp1252 = TextEncoding._('cp1252', 'Windows-1252 (Western)');
-  static const latin1 = TextEncoding._('latin1', 'ISO-8859-1 (Latin-1)');
-  static const cp1251 = TextEncoding._('cp1251', 'Windows-1251 (Cyrillic)');
+  /// Ομάδα για την ταξινόμηση στις λίστες επιλογής (Unicode, Ελληνικά, ...).
+  final String group;
+  const TextEncoding._(this.id, this.label, this.group);
 
+  // ── Unicode / γενικές ────────────────────────────────────────────────
+  static const utf8Enc = TextEncoding._('utf8', 'UTF-8', 'Unicode');
+  static const utf8Bom = TextEncoding._('utf8bom', 'UTF-8 (BOM)', 'Unicode');
+  static const utf16le = TextEncoding._('utf16le', 'UTF-16 LE', 'Unicode');
+  static const utf16be = TextEncoding._('utf16be', 'UTF-16 BE', 'Unicode');
+  static const utf32le = TextEncoding._('utf32le', 'UTF-32 LE', 'Unicode');
+  static const utf32be = TextEncoding._('utf32be', 'UTF-32 BE', 'Unicode');
+  static const ascii7 = TextEncoding._('ascii', 'US-ASCII (7-bit)', 'Unicode');
+
+  // ── Ελληνικά ─────────────────────────────────────────────────────────
+  static const cp1253 = TextEncoding._('cp1253', 'Windows-1253 (Greek)', 'Greek');
+  static const iso88597 = TextEncoding._('iso88597', 'ISO-8859-7 (Greek)', 'Greek');
+  static const cp737 = TextEncoding._('cp737', 'IBM CP737 (Greek, DOS)', 'Greek');
+  static const cp869 = TextEncoding._('cp869', 'IBM CP869 (Greek, DOS)', 'Greek');
+  static const macGreek = TextEncoding._('macgreek', 'Mac Greek', 'Greek');
+
+  // ── Δυτικοευρωπαϊκές ─────────────────────────────────────────────────
+  static const cp1252 = TextEncoding._('cp1252', 'Windows-1252 (Western)', 'Western European');
+  static const latin1 = TextEncoding._('latin1', 'ISO-8859-1 (Latin-1)', 'Western European');
+  static const iso885915 = TextEncoding._('iso885915', 'ISO-8859-15 (Latin-9, €)', 'Western European');
+  static const iso885910 = TextEncoding._('iso885910', 'ISO-8859-10 (Nordic)', 'Western European');
+  static const iso885914 = TextEncoding._('iso885914', 'ISO-8859-14 (Celtic)', 'Western European');
+  static const iso88593 = TextEncoding._('iso88593', 'ISO-8859-3 (South European)', 'Western European');
+  static const cp437 = TextEncoding._('cp437', 'IBM CP437 (US, DOS)', 'Western European');
+  static const cp850 = TextEncoding._('cp850', 'IBM CP850 (Western, DOS)', 'Western European');
+  static const cp858 = TextEncoding._('cp858', 'IBM CP858 (Western + €, DOS)', 'Western European');
+  static const cp860 = TextEncoding._('cp860', 'IBM CP860 (Portuguese, DOS)', 'Western European');
+  static const cp861 = TextEncoding._('cp861', 'IBM CP861 (Icelandic, DOS)', 'Western European');
+  static const cp863 = TextEncoding._('cp863', 'IBM CP863 (Canadian French, DOS)', 'Western European');
+  static const cp865 = TextEncoding._('cp865', 'IBM CP865 (Nordic, DOS)', 'Western European');
+  static const macRoman = TextEncoding._('macroman', 'Mac Roman', 'Western European');
+
+  // ── Κεντρική / Ανατολική Ευρώπη ──────────────────────────────────────
+  static const cp1250 = TextEncoding._('cp1250', 'Windows-1250 (Central European)', 'Central European');
+  static const iso88592 = TextEncoding._('iso88592', 'ISO-8859-2 (Latin-2)', 'Central European');
+  static const iso885916 = TextEncoding._('iso885916', 'ISO-8859-16 (Latin-10)', 'Central European');
+  static const cp852 = TextEncoding._('cp852', 'IBM CP852 (Central European, DOS)', 'Central European');
+  static const macLatin2 = TextEncoding._('maclatin2', 'Mac Central European', 'Central European');
+
+  // ── Βαλτική ──────────────────────────────────────────────────────────
+  static const cp1257 = TextEncoding._('cp1257', 'Windows-1257 (Baltic)', 'Baltic');
+  static const iso885913 = TextEncoding._('iso885913', 'ISO-8859-13 (Baltic)', 'Baltic');
+  static const iso88594 = TextEncoding._('iso88594', 'ISO-8859-4 (North European)', 'Baltic');
+  static const cp775 = TextEncoding._('cp775', 'IBM CP775 (Baltic, DOS)', 'Baltic');
+
+  // ── Κυριλλικά ────────────────────────────────────────────────────────
+  static const cp1251 = TextEncoding._('cp1251', 'Windows-1251 (Cyrillic)', 'Cyrillic');
+  static const iso88595 = TextEncoding._('iso88595', 'ISO-8859-5 (Cyrillic)', 'Cyrillic');
+  static const koi8r = TextEncoding._('koi8r', 'KOI8-R (Russian)', 'Cyrillic');
+  static const koi8u = TextEncoding._('koi8u', 'KOI8-U (Ukrainian)', 'Cyrillic');
+  static const cp866 = TextEncoding._('cp866', 'IBM CP866 (Cyrillic, DOS)', 'Cyrillic');
+  static const cp855 = TextEncoding._('cp855', 'IBM CP855 (Cyrillic, DOS)', 'Cyrillic');
+  static const macCyrillic = TextEncoding._('maccyrillic', 'Mac Cyrillic', 'Cyrillic');
+
+  // ── Τουρκικά ─────────────────────────────────────────────────────────
+  static const cp1254 = TextEncoding._('cp1254', 'Windows-1254 (Turkish)', 'Turkish');
+  static const iso88599 = TextEncoding._('iso88599', 'ISO-8859-9 (Latin-5, Turkish)', 'Turkish');
+  static const cp857 = TextEncoding._('cp857', 'IBM CP857 (Turkish, DOS)', 'Turkish');
+
+  // ── Εβραϊκά ──────────────────────────────────────────────────────────
+  static const cp1255 = TextEncoding._('cp1255', 'Windows-1255 (Hebrew)', 'Hebrew');
+  static const iso88598 = TextEncoding._('iso88598', 'ISO-8859-8 (Hebrew)', 'Hebrew');
+  static const cp862 = TextEncoding._('cp862', 'IBM CP862 (Hebrew, DOS)', 'Hebrew');
+
+  // ── Αραβικά ──────────────────────────────────────────────────────────
+  static const cp1256 = TextEncoding._('cp1256', 'Windows-1256 (Arabic)', 'Arabic');
+  static const iso88596 = TextEncoding._('iso88596', 'ISO-8859-6 (Arabic)', 'Arabic');
+
+  // ── Βιετναμέζικα / Ταϊλανδέζικα ──────────────────────────────────────
+  static const cp1258 = TextEncoding._('cp1258', 'Windows-1258 (Vietnamese)', 'Vietnamese / Thai');
+  static const cp874 = TextEncoding._('cp874', 'Windows-874 (Thai)', 'Vietnamese / Thai');
+  static const iso885911 = TextEncoding._('iso885911', 'ISO-8859-11 (Thai)', 'Vietnamese / Thai');
+
+  /// Με τη σειρά που εμφανίζονται στις λίστες επιλογής (ομαδοποιημένα).
   static const all = <TextEncoding>[
-    utf8Enc, utf8Bom, utf16le, utf16be, cp1253, iso88597, cp1252, latin1, cp1251,
+    // Unicode
+    utf8Enc, utf8Bom, utf16le, utf16be, utf32le, utf32be, ascii7,
+    // Greek
+    cp1253, iso88597, cp737, cp869, macGreek,
+    // Western European
+    cp1252, latin1, iso885915, iso885910, iso885914, iso88593,
+    cp437, cp850, cp858, cp860, cp861, cp863, cp865, macRoman,
+    // Central European
+    cp1250, iso88592, iso885916, cp852, macLatin2,
+    // Baltic
+    cp1257, iso885913, iso88594, cp775,
+    // Cyrillic
+    cp1251, iso88595, koi8r, koi8u, cp866, cp855, macCyrillic,
+    // Turkish
+    cp1254, iso88599, cp857,
+    // Hebrew
+    cp1255, iso88598, cp862,
+    // Arabic
+    cp1256, iso88596,
+    // Vietnamese / Thai
+    cp1258, cp874, iso885911,
   ];
 
   static TextEncoding? byId(String? id) {
@@ -31,6 +125,10 @@ class TextEncoding {
     }
     return null;
   }
+
+  /// true για τις κωδικοποιήσεις Unicode (καλύπτουν κάθε χαρακτήρα, εκτός
+  /// από το US-ASCII που καλύπτει μόνο τους 128 πρώτους).
+  bool get isUnicode => group == 'Unicode' && this != ascii7;
 
   @override
   String toString() => label;
@@ -119,7 +217,7 @@ class TextCodecs {
     if (e == TextEncoding.iso88597) return _iso88597Table;
     if (e == TextEncoding.cp1252) return _cp1252Table;
     if (e == TextEncoding.cp1251) return _cp1251Table;
-    return null; // latin1 = ταυτοτικό, οι υπόλοιπες είναι Unicode
+    return kSingleByteTables[e.id]; // null: latin1 = ταυτοτικό, ή Unicode/ASCII
   }
 
   static final Map<TextEncoding, Map<int, int>> _reverse = {};
@@ -135,13 +233,19 @@ class TextCodecs {
     }
   }
 
-  /// Μαντεύει την κωδικοποίηση. Σειρά: BOM → έγκυρο UTF-8 → UTF-16 χωρίς BOM
+  /// Μαντεύει την κωδικοποίηση. Σειρά: BOM (UTF-8/32/16) → έγκυρο UTF-8 → UTF-16 χωρίς BOM
   /// (πολλά μηδενικά bytes) → παλιά μονοψήφια κωδικοποίηση (ελληνικά
   /// Windows-1253 αν τα bytes ≥0x80 εμφανίζονται σε ομάδες, αλλιώς
   /// Windows-1252). Δεν είναι αλάνθαστο — ο χρήστης μπορεί να το αλλάξει.
   static TextEncoding detect(Uint8List b) {
     if (b.length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) {
       return TextEncoding.utf8Bom;
+    }
+    if (b.length >= 4 && b[0] == 0xFF && b[1] == 0xFE && b[2] == 0 && b[3] == 0) {
+      return TextEncoding.utf32le; // πρέπει να ελεγχθεί ΠΡΙΝ το UTF-16 LE
+    }
+    if (b.length >= 4 && b[0] == 0 && b[1] == 0 && b[2] == 0xFE && b[3] == 0xFF) {
+      return TextEncoding.utf32be;
     }
     if (b.length >= 2 && b[0] == 0xFF && b[1] == 0xFE) return TextEncoding.utf16le;
     if (b.length >= 2 && b[0] == 0xFE && b[1] == 0xFF) return TextEncoding.utf16be;
@@ -199,6 +303,30 @@ class TextCodecs {
       }
       return String.fromCharCodes(units);
     }
+    if (enc == TextEncoding.utf32le || enc == TextEncoding.utf32be) {
+      final be = enc == TextEncoding.utf32be;
+      var start = 0;
+      if (bytes.length >= 4) {
+        if (!be && bytes[0] == 0xFF && bytes[1] == 0xFE && bytes[2] == 0 && bytes[3] == 0) start = 4;
+        if (be && bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0xFE && bytes[3] == 0xFF) start = 4;
+      }
+      final runes = <int>[];
+      for (var i = start; i + 3 < bytes.length; i += 4) {
+        final cp = be
+            ? (bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]
+            : (bytes[i + 3] << 24) | (bytes[i + 2] << 16) | (bytes[i + 1] << 8) | bytes[i];
+        // Μη έγκυρο code point (πάνω από U+10FFFF ή surrogate) -> �
+        runes.add((cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) ? _replacement : cp);
+      }
+      return String.fromCharCodes(runes);
+    }
+    if (enc == TextEncoding.ascii7) {
+      final out = StringBuffer();
+      for (final byte in bytes) {
+        out.writeCharCode(byte < 0x80 ? byte : _replacement);
+      }
+      return out.toString();
+    }
     final table = _tableFor(enc);
     final out = StringBuffer();
     for (final byte in bytes) {
@@ -238,6 +366,26 @@ class TextCodecs {
       }
       return out.toBytes();
     }
+    if (enc == TextEncoding.utf32le || enc == TextEncoding.utf32be) {
+      final be = enc == TextEncoding.utf32be;
+      final out = BytesBuilder();
+      out.add(be ? [0x00, 0x00, 0xFE, 0xFF] : [0xFF, 0xFE, 0x00, 0x00]);
+      for (final r in text.runes) {
+        if (be) {
+          out.add([(r >> 24) & 0xFF, (r >> 16) & 0xFF, (r >> 8) & 0xFF, r & 0xFF]);
+        } else {
+          out.add([r & 0xFF, (r >> 8) & 0xFF, (r >> 16) & 0xFF, (r >> 24) & 0xFF]);
+        }
+      }
+      return out.toBytes();
+    }
+    if (enc == TextEncoding.ascii7) {
+      final out = BytesBuilder();
+      for (final rune in text.runes) {
+        out.addByte(rune < 0x80 ? rune : 0x3F);
+      }
+      return out.toBytes();
+    }
     final table = _tableFor(enc);
     final reverse = _reverse.putIfAbsent(enc, () {
       final m = <int, int>{};
@@ -259,5 +407,34 @@ class TextCodecs {
       }
     }
     return out.toBytes();
+  }
+
+  /// Πόσοι χαρακτήρες του [text] ΔΕΝ υπάρχουν στην κωδικοποίηση-στόχο [enc]
+  /// (θα γίνουν '?' από την [encode]). 0 για τις κωδικοποιήσεις Unicode.
+  /// Χρησιμεύει για προειδοποίηση πριν από μετατροπή με απώλεια.
+  static int countUnencodable(String text, TextEncoding enc) {
+    if (enc.isUnicode) return 0;
+    if (enc == TextEncoding.ascii7) {
+      var n = 0;
+      for (final r in text.runes) {
+        if (r >= 0x80) n++;
+      }
+      return n;
+    }
+    final table = _tableFor(enc);
+    Set<int>? supported;
+    if (table != null) {
+      supported = {for (final cp in table) if (cp != _replacement) cp};
+    }
+    var n = 0;
+    for (final r in text.runes) {
+      if (r < 0x80) continue;
+      if (table == null) {
+        if (r > 0xFF) n++; // Latin-1
+      } else if (!supported!.contains(r)) {
+        n++;
+      }
+    }
+    return n;
   }
 }
