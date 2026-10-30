@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path/path.dart' as p;
 import 'package:printing/printing.dart';
+import 'code_highlighter.dart';
 import 'live_preview_controller.dart';
 import 'markdown_highlight_controller.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -211,8 +212,47 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _note = NoteDocument(title: '');
     }
     await _loadOverlay();
+    // Τύπος εγγράφου: από το αποθηκευμένο tag· αλλιώς από την κατάληξη του
+    // αρχείου που ανοίχτηκε· αλλιώς Κείμενο/Markdown (προεπιλογή).
+    var type = DocType.fromTags(_note!.tags);
+    if (type == DocType.markdown && !_note!.tags.any(DocType.isTypeTag)) {
+      type = DocType.fromFileName(widget.originFilePath);
+    }
+    _bodyController.docType = type;
     _history[0] = _bodyController.text;
     setState(() => _isLoading = false);
+  }
+
+  DocType get _docType => _bodyController.docType;
+
+  void _setDocType(DocType t) {
+    final tags = _note!.tags.where((x) => !DocType.isTypeTag(x)).toList();
+    if (t != DocType.markdown) tags.add(t.tag);
+    setState(() {
+      _note!.tags = tags;
+      _bodyController.docType = t;
+    });
+    _dirty = true;
+  }
+
+  Future<void> _pickDocType() async {
+    final picked = await showDialog<DocType>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(tr(context, el: 'Τύπος εγγράφου', en: 'Document type')),
+        children: [
+          for (final d in DocType.values)
+            RadioListTile<DocType>(
+              value: d,
+              groupValue: _docType,
+              secondary: Icon(d.icon),
+              title: Text(tr(context, el: d.labelEl, en: d.labelEn)),
+              onChanged: (v) => Navigator.of(ctx).pop(v),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) _setDocType(picked);
   }
 
   Future<void> _loadOverlay() async {
@@ -712,7 +752,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Future<void> _importFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['md', 'txt', 'fnotes', 'json', 'pdf', 'docx', 'doc', 'rtf'],
+      allowedExtensions: ['md', 'txt', 'fnotes', 'json', 'pdf', 'docx', 'doc', 'rtf', 'java', 'py', 'css', 'dart', 'html', 'htm', 'js', 'php'],
     );
     if (result == null || result.files.isEmpty) return;
     final file = File(result.files.single.path!);
@@ -779,6 +819,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         content = await file.readAsString();
       }
       _bodyController.text = content;
+      // Αρχείο κώδικα (.py, .java, …): αυτόματη επιλογή τύπου εγγράφου.
+      final imported = DocType.fromFileName(file.path);
+      if (imported.isCode) _setDocType(imported);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Σφάλμα: $e')));
     }
@@ -1087,6 +1130,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             tooltip: tr(context, el: 'Περισσότερα', en: 'More'),
             onSelected: (value) {
               switch (value) {
+                case 'doc_type': _pickDocType(); break;
                 case 'import': _importFile(); break;
                 case 'import_qr': _importViaQr(); break;
                 case 'export': _exportThisNote(); break;
@@ -1095,6 +1139,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               }
             },
             itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'doc_type',
+                child: ListTile(
+                  leading: Icon(_docType.icon),
+                  title: Text(tr(context, el: 'Τύπος εγγράφου', en: 'Document type')),
+                  subtitle: Text(tr(context, el: _docType.labelEl, en: _docType.labelEn)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 value: 'import',
                 child: ListTile(
@@ -1156,7 +1209,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               child: Wrap(
                 spacing: 6,
                 children: [
-                  for (final tag in _note!.tags)
+                  for (final tag in _note!.tags.where((t) => !DocType.isTypeTag(t)))
                     InputChip(
                       label: Text(tag),
                       onDeleted: _previewMode ? null : () => setState(() => _note!.tags = _note!.tags.where((t) => t != tag).toList()),
@@ -1175,7 +1228,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
 
           // ── Formatting Toolbar (μόνο στο edit mode) ──────────────────
-          if (!_previewMode) ...[
+          if (!_previewMode && !_docType.isCode) ...[
             const Divider(height: 1),
             Material(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -1299,12 +1352,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         maxLines: null,
         expands: true,
         textAlignVertical: TextAlignVertical.top,
-        style: NoteFonts.style(
-          _note!.font,
-          TextStyle(fontSize: _note!.fontSize, height: 1.5),
-        ),
-        decoration: const InputDecoration(
-          hintText: '# Γράψε σε markdown...',
+        style: _docType.isCode
+            ? TextStyle(fontSize: _note!.fontSize, height: 1.5, fontFamily: 'monospace')
+            : NoteFonts.style(
+                _note!.font,
+                TextStyle(fontSize: _note!.fontSize, height: 1.5),
+              ),
+        keyboardType: _docType.isCode ? TextInputType.multiline : null,
+        autocorrect: !_docType.isCode,
+        enableSuggestions: !_docType.isCode,
+        decoration: InputDecoration(
+          hintText: _docType.isCode
+              ? '// ${_docType.labelEn}...'
+              : '# Γράψε σε markdown...',
           border: InputBorder.none,
         ),
       ),
@@ -1359,6 +1419,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final text = _bodyController.text;
     if (text.trim().isEmpty) {
       return Center(child: Text(tr(context, el: '(κενή σημείωση)', en: '(empty note)'), style: const TextStyle(color: Colors.grey)));
+    }
+    if (_docType.isCode) {
+      // Έγγραφο κώδικα: Προβολή = ο κώδικας με χρωματισμό, μονόχωρη γραμματοσειρά.
+      final base = TextStyle(
+          fontSize: _note!.fontSize,
+          height: 1.5,
+          fontFamily: 'monospace',
+          color: Theme.of(context).colorScheme.onSurface);
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SelectableText.rich(TextSpan(
+            style: base,
+            children: CodeHighlighter.highlight(
+                text, _docType, base, Theme.of(context).brightness),
+          )),
+        ),
+      );
     }
     return LayoutBuilder(
       builder: (context, constraints) {
